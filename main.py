@@ -247,7 +247,7 @@ def main():
     # --- Placeholders OUTSIDE of any columns or spinners ---
     progress_bar = st.progress(0)  # Initialize progress bar
     eta_placeholder = st.empty()  # Placeholder for ETA display
-    live_translation_placeholder = st.empty()  # Placeholder for live translation
+    # REMOVE: live_translation_placeholder = st.empty()  # No live translation
 
     uploaded_file = st.file_uploader("Choose a file", type=["docx", "pdf"])
 
@@ -281,7 +281,7 @@ def main():
             target_language_name = target_language_tuple[0]  # Get the name
             target_language_code = target_language_tuple[1]
 
-        show_live_translation = st.checkbox("Show Live Translation", value=False)
+        # REMOVE: show_live_translation = st.checkbox("Show Live Translation", value=False) # No live translation
 
 
         if st.button("Translate"):
@@ -352,11 +352,7 @@ def main():
                         remaining_time = estimated_total_time - elapsed_time
                         eta_placeholder.write(f"Estimated time remaining: {remaining_time:.2f} seconds") # Use the OUTSIDE placeholder
 
-                    #Show Live Translation
-                    if show_live_translation:
-                        if status == "translated":
-                            live_translation_placeholder.write(f"**Paragraph {i+1}:** {translated_text}")  # Use the OUTSIDE placeholder
-
+                    # REMOVE Live Translation section
 
                 df = pd.DataFrame(df_data)
                 st.success("Translation complete!")
