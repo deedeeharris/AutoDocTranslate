@@ -311,15 +311,21 @@ def main():
                     st.error(f"Error: {e}")
                     return
 
+            #Move these lines *before* the `with st.spinner("Translating...")` block:
+            progress_bar = st.progress(0)  # Initialize progress bar
+            start_time = time.time()  # Record start time
+            eta_placeholder = st.empty()  # Placeholder for ETA display
+            live_translation_placeholder = st.empty() # Placeholder for live translation
+
             with st.spinner("Translating..."):
                 df_data = []
                 translated_paragraphs = []
-                progress_bar = st.progress(0)  # Initialize progress bar
-                start_time = time.time()  # Record start time
+                # progress_bar = st.progress(0)  # Initialize progress bar  <- REMOVE
+                # start_time = time.time()  # Record start time <- REMOVE
                 total_delay = 0 # Initialize total delay
                 estimated_total_time = 0 # Initialize estimated time
-                eta_placeholder = st.empty()  # Placeholder for ETA display
-                live_translation_placeholder = st.empty() # Placeholder for live translation
+                # eta_placeholder = st.empty()  # Placeholder for ETA display <- REMOVE
+                # live_translation_placeholder = st.empty() # Placeholder for live translation <- REMOVE
 
                 for i, paragraph in enumerate(paragraphs):
                     try:
