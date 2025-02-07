@@ -245,6 +245,14 @@ def main():
     st.write("Upload a .docx or .pdf file to begin.")
 
     uploaded_file = st.file_uploader("Choose a file", type=["docx", "pdf"])
+    # Initialize session state variables if they don't exist
+    if 'combined_doc_filename' not in st.session_state:
+        st.session_state.combined_doc_filename = None
+    if 'translated_doc_filename' not in st.session_state:
+        st.session_state.translated_doc_filename = None
+    if 'translated_pdf_filename' not in st.session_state:
+        st.session_state.translated_pdf_filename = None
+
 
     if uploaded_file is not None:
         file_content = uploaded_file.read()  # Read file content as bytes
@@ -369,8 +377,8 @@ def main():
                             paragraph_format = paragraph.paragraph_format # Use paragraph_format
                             paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
-                combined_doc_filename = "combined_translation.docx"
-                combined_doc.save(combined_doc_filename)
+                st.session_state.combined_doc_filename = "combined_translation.docx"
+                combined_doc.save(st.session_state.combined_doc_filename)
 
                 translated_doc = Document()
                 create_header(translated_doc, "Translated with AI, by Yedidya Harris")
@@ -382,44 +390,55 @@ def main():
                     paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
                     translated_doc.add_paragraph("")
 
-                translated_doc_filename = "translated_document.docx"
-                translated_doc.save(translated_doc_filename)
+                st.session_state.translated_doc_filename = "translated_document.docx"
+                translated_doc.save(st.session_state.translated_doc_filename)
 
             # --- PDF Output ---
             with st.spinner("Generating PDF file..."):
-                translated_pdf_filename = "translated_document.pdf"
-                create_pdf_from_paragraphs(translated_paragraphs, translated_pdf_filename, is_rtl=is_target_rtl)
+                st.session_state.translated_pdf_filename = "translated_document.pdf"
+                create_pdf_from_paragraphs(translated_paragraphs, st.session_state.translated_pdf_filename, is_rtl=is_target_rtl)
 
 
             # --- Download Links ---
             st.subheader("Download Files")
-            # Use st.download_button for a cleaner UI
-            with open(combined_doc_filename, "rb") as f:
-                st.download_button(
-                    label="Download Combined Translation (DOCX)",
-                    data=f,
-                    file_name=combined_doc_filename,
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                )
-            with open(translated_doc_filename, "rb") as f:
-                st.download_button(
-                    label="Download Translated Document (DOCX)",
-                    data=f,
-                    file_name=translated_doc_filename,
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                )
-            with open(translated_pdf_filename, "rb") as f:
-                st.download_button(
-                    label="Download Translated Document (PDF)",
-                    data=f,
-                    file_name=translated_pdf_filename,
-                    mime="application/pdf",
-                )
+            # Use st.download_button for a cleaner UI, and check if files exist
+            if st.session_state.combined_doc_filename and os.path.exists(st.session_state.combined_doc_filename):
+                with open(st.session_state.combined_doc_filename, "rb") as f:
+                    st.download_button(
+                        label="Download Combined Translation (DOCX)",
+                        data=f,
+                        file_name=st.session_state.combined_doc_filename,
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    )
+            if st.session_state.translated_doc_filename and os.path.exists(st.session_state.translated_doc_filename):
+                with open(st.session_state.translated_doc_filename, "rb") as f:
+                    st.download_button(
+                        label="Download Translated Document (DOCX)",
+                        data=f,
+                        file_name=st.session_state.translated_doc_filename,
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    )
+            if st.session_state.translated_pdf_filename and os.path.exists(st.session_state.translated_pdf_filename):
+                with open(st.session_state.translated_pdf_filename, "rb") as f:
+                    st.download_button(
+                        label="Download Translated Document (PDF)",
+                        data=f,
+                        file_name=st.session_state.translated_pdf_filename,
+                        mime="application/pdf",
+                    )
 
-            # Clean up temporary files (optional, but good practice)
-            os.remove(combined_doc_filename)
-            os.remove(translated_doc_filename)
-            os.remove(translated_pdf_filename)
+            # Clean up is now handled after the download buttons, and only if the files exist
+            if st.session_state.combined_doc_filename and os.path.exists(st.session_state.combined_doc_filename):
+                os.remove(st.session_state.combined_doc_filename)
+            if st.session_state.translated_doc_filename and os.path.exists(st.session_state.translated_doc_filename):
+                os.remove(st.session_state.translated_doc_filename)
+            if st.session_state.translated_pdf_filename and os.path.exists(st.session_state.translated_pdf_filename):
+                os.remove(st.session_state.translated_pdf_filename)
+
+            # Reset filenames in session state to None after processing and downloading
+            st.session_state.combined_doc_filename = None
+            st.session_state.translated_doc_filename = None
+            st.session_state.translated_pdf_filename = None
 
 if __name__ == "__main__":
     main()
