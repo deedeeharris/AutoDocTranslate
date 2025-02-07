@@ -50,20 +50,17 @@ def create_header(document, text):
         header = section.header
         paragraph = header.paragraphs[0]
         paragraph.text = text
-        paragraph_format = paragraph.paragraph_format  # Use paragraph_format for alignment
+        paragraph_format = paragraph.paragraph_format
         paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
 def extract_text_from_docx(docx_bytes):
     """Extracts text from a .docx file."""
     try:
         doc = Document(io.BytesIO(docx_bytes))
-        full_text = []
-        for paragraph in doc.paragraphs:
-            full_text.append(paragraph.text)
-        return "\n\n".join(full_text)
+        return "\n\n".join([paragraph.text for paragraph in doc.paragraphs])
     except Exception as e:
         logging.error(f"Error extracting text from DOCX: {e}")
-        st.error(f"Error extracting text from DOCX: {e}")  # Display error in Streamlit
+        st.error(f"Error extracting text from DOCX: {e}")
         return ""
 
 def extract_text_from_pdf(pdf_bytes):
@@ -71,22 +68,20 @@ def extract_text_from_pdf(pdf_bytes):
     text = ""
     try:
         with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
-            for page in doc:
-                text += page.get_text()
+            text = "".join([page.get_text() for page in doc])
         return text
     except Exception as e:
         logging.error(f"Error extracting text from PDF: {e}")
-        st.error(f"Error extracting text from PDF: {e}") # Display error in Streamlit
+        st.error(f"Error extracting text from PDF: {e}")
         return ""
 
 def split_into_paragraphs(text):
     """Splits text into paragraphs based on double newlines."""
-    paragraphs = text.split("\n\n")
-    return [p.strip() for p in paragraphs if p.strip()]
+    return [p.strip() for p in text.split("\n\n") if p.strip()]
 
 def create_translation_prompt(source_language, target_language, document_summary, paragraph):
-    """Creates the translation prompt for Gemini.  Now uses full language names."""
-    prompt = f"""You are a professional translator. Translate the following paragraph from {source_language} to {target_language}.
+    """Creates the translation prompt for Gemini."""
+    return f"""You are a professional translator. Translate the following paragraph from {source_language} to {target_language}.
 Maintain the original meaning and tone as closely as possible.  Be as accurate as possible.
 
 Here is a summary of the entire document for context:
@@ -94,47 +89,47 @@ Here is a summary of the entire document for context:
 
 Paragraph to translate:
 {paragraph}"""
-    return prompt
 
-def translate_paragraph(paragraph, source_language, target_language, document_summary, retries=3, delay=5):
-    """Translates a single paragraph using Gemini, with retries and delay."""
+def translate_paragraph(paragraph, source_language, target_language, document_summary, retries=3):
+    """Translates a single paragraph using Gemini, with retries."""
     prompt = create_translation_prompt(source_language, target_language, document_summary, paragraph)
-
     for attempt in range(retries):
         try:
+            start_time = time.time()  # Time the API call
             response = model.generate_content(prompt)
+            end_time = time.time()  # Time the API call
+            api_call_time = end_time - start_time  # Calculate the actual API call time
+
             if response.text:
-                return response.text, "translated", delay  # Return the delay
+                return response.text, "translated", api_call_time  # Return actual API call time
             else:
                 logging.warning(f"Empty response from Gemini on attempt {attempt + 1}.")
-                st.warning(f"Empty response from Gemini on attempt {attempt + 1}.") # Display warning
-                return "", "failed", delay # Return delay even on failure
+                st.warning(f"Empty response from Gemini on attempt {attempt + 1}.")
+                return "", "failed", 0  # Return 0 for failed attempts
+
         except google_api_exceptions.ClientError as e:
             logging.error(f"Gemini API error on attempt {attempt + 1}: {e}")
-            st.error(f"Gemini API error on attempt {attempt + 1}: {e}") # Display error
+            st.error(f"Gemini API error on attempt {attempt + 1}: {e}")
             if e.code == 400 and "API key not valid" in str(e):
                 raise ValueError("Invalid API Key provided.") from e
-            elif e.code == 429 or "Response is blocked" in str(e):
-                st.warning("Rate limit exceeded or response blocked. Waiting before retrying...") # Display warning
-                logging.warning("Rate limit exceeded or response blocked. Waiting before retrying...")
+            #  No special handling for 429 errors, just retry
             elif attempt < retries - 1:
-                st.info(f"Retrying in {delay} seconds...") # Display info
-                logging.info(f"Retrying in {delay} seconds...")
+                st.info(f"Retrying...")  # Simplified retry message
+                logging.info(f"Retrying...")
             else:
-                return "", "failed", delay # Return delay even on failure
+                return "", "failed", 0  # Return 0 delay on failure
+
         except Exception as e:
             logging.error(f"Unexpected error on attempt {attempt + 1}: {e}")
-            st.error(f"Unexpected error on attempt {attempt + 1}: {e}") # Display error
+            st.error(f"Unexpected error on attempt {attempt + 1}: {e}")
             if attempt < retries - 1:
-                st.info(f"Retrying in {delay} seconds...") # Display info
-                logging.info(f"Retrying in {delay} seconds...")
+                st.info(f"Retrying...")
+                logging.info(f"Retrying...")
             else:
-                return "", "failed", delay # Return delay even on failure
-        finally:
-            if attempt < retries - 1:
-                time.sleep(delay)
+                return "", "failed", 0  # Return 0 delay on failure
 
-    return "", "failed", delay # Return delay even on failure
+    return "", "failed", 0  # Return 0 delay if all retries fail
+
 
 def generate_summary(text, max_length=500):
     """Generates a summary of the document using Gemini."""
@@ -142,15 +137,9 @@ def generate_summary(text, max_length=500):
     try:
         response = model.generate_content(prompt)
         return response.text if response.text else "Summary generation failed."
-    except google_api_exceptions.ClientError as e:
-        logging.error(f"Error generating summary: {e}")
-        st.error(f"Error generating summary: {e}") # Display error
-        if e.code == 400 and "API key not valid" in str(e):
-            raise ValueError("Invalid API Key provided.") from e
-        return "Summary generation failed."
     except Exception as e:
         logging.error(f"Error generating summary: {e}")
-        st.error(f"Error generating summary: {e}") # Display error
+        st.error(f"Error generating summary: {e}")
         return "Summary generation failed."
 
 def set_paragraph_rtl(paragraph):
@@ -158,7 +147,7 @@ def set_paragraph_rtl(paragraph):
     pPr = paragraph._element.get_or_add_pPr()
     bidi = OxmlElement('w:bidi')
     pPr.append(bidi)
-    paragraph_format = paragraph.paragraph_format # Use paragraph_format
+    paragraph_format = paragraph.paragraph_format
     paragraph_format.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
 
 def set_table_rtl(table):
@@ -172,7 +161,7 @@ def set_table_rtl(table):
     tblPr.append(bidi_visual)
 
 def create_pdf_from_paragraphs(paragraphs, filename, is_rtl=False):
-    """Creates a PDF from a list of paragraphs, with justification and header."""
+    """Creates a PDF from a list of paragraphs."""
     doc = SimpleDocTemplate(filename, pagesize=A4)
     elements = []
 
@@ -235,7 +224,7 @@ def main():
         # Add a nice image to the sidebar
         try:
             image = Image.open('translator_image.png')  # Replace with your image path
-            st.image(image, caption='AI Translation', use_column_width=True)
+            st.image(image, caption='AI Translation', use_container_width=True)
         except FileNotFoundError:
             st.warning("Image file not found.  Please add translator_image.png to your project.")
 
@@ -247,12 +236,11 @@ def main():
     # --- Placeholders OUTSIDE of any columns or spinners ---
     progress_bar = st.progress(0)  # Initialize progress bar
     eta_placeholder = st.empty()  # Placeholder for ETA display
-    live_translation_placeholder = st.empty()  # Placeholder for live translation
 
     uploaded_file = st.file_uploader("Choose a file", type=["docx", "pdf"])
 
     if uploaded_file is not None:
-        file_content = uploaded_file.read()  # Read file content as bytes
+        file_content = uploaded_file.read()
         filename = uploaded_file.name
 
         language_options = [
@@ -268,20 +256,16 @@ def main():
             ('Hindi', 'hi')
         ]
 
-        col1, col2 = st.columns(2)  # Use columns for better layout
+        col1, col2 = st.columns(2)
         with col1:
-            # Store the language *name* (first element of the tuple)
             source_language_tuple = st.selectbox("Source Language", options=language_options, format_func=lambda x: x[0], key="source_lang")
-            source_language_name = source_language_tuple[0]  # Get the name
+            source_language_name = source_language_tuple[0]
             source_language_code = source_language_tuple[1]
 
         with col2:
-            # Store the language *name* (first element of the tuple)
             target_language_tuple = st.selectbox("Target Language", options=language_options, format_func=lambda x: x[0], key="target_lang")
-            target_language_name = target_language_tuple[0]  # Get the name
+            target_language_name = target_language_tuple[0]
             target_language_code = target_language_tuple[1]
-
-        show_live_translation = st.checkbox("Show Live Translation", value=False)
 
 
         if st.button("Translate"):
@@ -289,7 +273,6 @@ def main():
                 st.error("Source and target languages cannot be the same.")
                 return
 
-            # Check for RTL *after* language selection, using the language code.
             is_target_rtl = target_language_code.lower() in ['he', 'ar', 'fa', 'ur', 'yi']
 
             with st.spinner("Processing document..."):
@@ -306,7 +289,7 @@ def main():
                     return
 
                 paragraphs = split_into_paragraphs(text)
-                num_paragraphs = len(paragraphs) # Get total paragraphs
+                num_paragraphs = len(paragraphs)
                 try:
                     document_summary = generate_summary(text)
                     st.success("Document summary generated.")
@@ -315,21 +298,21 @@ def main():
                 except ValueError as e:
                     st.error(f"Error: {e}")
                     return
-
+                except Exception as e:
+                    st.error(f"Error generating summary: {e}")
+                    return
 
             with st.spinner("Translating..."):
                 df_data = []
                 translated_paragraphs = []
-                start_time = time.time()  # Record start time
-                total_delay = 0 # Initialize total delay
-                estimated_total_time = 0 # Initialize estimated time
-
+                start_time = time.time()
+                total_api_time = 0
 
                 for i, paragraph in enumerate(paragraphs):
                     try:
-                        # Pass the language *names* to translate_paragraph.
-                        translated_text, status, delay = translate_paragraph(paragraph, source_language_name, target_language_name, document_summary)
-                        total_delay += delay
+                        translated_text, status, api_call_time = translate_paragraph(paragraph, source_language_name, target_language_name, document_summary)
+                        total_api_time += api_call_time
+
                         df_data.append({
                             "paragraph_id": i + 1,
                             "source_text": paragraph,
@@ -342,20 +325,17 @@ def main():
                         st.error(f"Error: {e}")
                         return
 
-                    # Update progress bar and ETA
+                    # --- Progress Bar and ETA Calculation ---
                     progress = (i + 1) / num_paragraphs
-                    progress_bar.progress(progress)  # Use the OUTSIDE placeholder
+                    progress_bar.progress(progress)
 
-                    if i > 0: # Avoid division by zero on first iteration
+                    if i > 0:
                         elapsed_time = time.time() - start_time
-                        estimated_total_time = elapsed_time * (num_paragraphs / (i+1))
+                        estimated_total_time = (total_api_time / progress) + (10 * (num_paragraphs - i -1)) # Add remaining delay
                         remaining_time = estimated_total_time - elapsed_time
-                        eta_placeholder.write(f"Estimated time remaining: {remaining_time:.2f} seconds") # Use the OUTSIDE placeholder
+                        eta_placeholder.write(f"Estimated time remaining: {remaining_time:.2f} seconds")
 
-                    #Show Live Translation
-                    if show_live_translation:
-                        if status == "translated":
-                            live_translation_placeholder.write(f"**Paragraph {i+1}:** {translated_text}")  # Use the OUTSIDE placeholder
+                    time.sleep(10)  # 10-second delay after EACH paragraph
 
 
                 df = pd.DataFrame(df_data)
@@ -364,7 +344,7 @@ def main():
             # --- Display Results ---
             st.subheader("Translation Results")
             with st.expander("Show Full Translation Table"):
-                st.dataframe(df)  # Display the DataFrame
+                st.dataframe(df)
 
             # --- DOCX Output ---
             with st.spinner("Generating DOCX files..."):
@@ -388,11 +368,11 @@ def main():
                     if is_target_rtl:
                         for paragraph in row_cells[2].paragraphs:
                             set_paragraph_rtl(paragraph)
-                            paragraph_format = paragraph.paragraph_format # Use paragraph_format
+                            paragraph_format = paragraph.paragraph_format
                             paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
                     else:
                         for paragraph in row_cells[2].paragraphs:
-                            paragraph_format = paragraph.paragraph_format # Use paragraph_format
+                            paragraph_format = paragraph.paragraph_format
                             paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
                 combined_doc_filename = "combined_translation.docx"
@@ -404,7 +384,7 @@ def main():
                     paragraph = translated_doc.add_paragraph(paragraph_text)
                     if is_target_rtl:
                         set_paragraph_rtl(paragraph)
-                    paragraph_format = paragraph.paragraph_format # Use paragraph_format
+                    paragraph_format = paragraph.paragraph_format
                     paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
                     translated_doc.add_paragraph("")
 
@@ -416,10 +396,8 @@ def main():
                 translated_pdf_filename = "translated_document.pdf"
                 create_pdf_from_paragraphs(translated_paragraphs, translated_pdf_filename, is_rtl=is_target_rtl)
 
-
             # --- Download Links ---
             st.subheader("Download Files")
-            # Use st.download_button for a cleaner UI
             with open(combined_doc_filename, "rb") as f:
                 st.download_button(
                     label="Download Combined Translation (DOCX)",
