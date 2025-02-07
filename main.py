@@ -223,7 +223,7 @@ def main():
     else:
         api_key_to_use = st.secrets["GEMINI_API_KEY"]
         st.sidebar.info("Using API key from secrets.")  # Optional: feedback
-    genai.configure(api_key=GEMINI_API_KEY)
+    genai.configure(api_key=api_key_to_use)
     
     generation_config = {
       "temperature": 0.1,  # More deterministic, less "creative"
