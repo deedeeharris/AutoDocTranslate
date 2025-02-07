@@ -104,11 +104,11 @@ def translate_paragraph(paragraph, source_language, target_language, document_su
         try:
             response = model.generate_content(prompt)
             if response.text:
-                return response.text, "translated"
+                return response.text, "translated", delay  # Return the delay
             else:
                 logging.warning(f"Empty response from Gemini on attempt {attempt + 1}.")
                 st.warning(f"Empty response from Gemini on attempt {attempt + 1}.") # Display warning
-                return "", "failed"
+                return "", "failed", delay # Return delay even on failure
         except google_api_exceptions.ClientError as e:
             logging.error(f"Gemini API error on attempt {attempt + 1}: {e}")
             st.error(f"Gemini API error on attempt {attempt + 1}: {e}") # Display error
@@ -121,7 +121,7 @@ def translate_paragraph(paragraph, source_language, target_language, document_su
                 st.info(f"Retrying in {delay} seconds...") # Display info
                 logging.info(f"Retrying in {delay} seconds...")
             else:
-                return "", "failed"
+                return "", "failed", delay # Return delay even on failure
         except Exception as e:
             logging.error(f"Unexpected error on attempt {attempt + 1}: {e}")
             st.error(f"Unexpected error on attempt {attempt + 1}: {e}") # Display error
@@ -129,12 +129,12 @@ def translate_paragraph(paragraph, source_language, target_language, document_su
                 st.info(f"Retrying in {delay} seconds...") # Display info
                 logging.info(f"Retrying in {delay} seconds...")
             else:
-                return "", "failed"
+                return "", "failed", delay # Return delay even on failure
         finally:
             if attempt < retries - 1:
                 time.sleep(delay)
 
-    return "", "failed"
+    return "", "failed", delay # Return delay even on failure
 
 def generate_summary(text, max_length=500):
     """Generates a summary of the document using Gemini."""
@@ -245,14 +245,6 @@ def main():
     st.write("Upload a .docx or .pdf file to begin.")
 
     uploaded_file = st.file_uploader("Choose a file", type=["docx", "pdf"])
-    # Initialize session state variables if they don't exist
-    if 'combined_doc_filename' not in st.session_state:
-        st.session_state.combined_doc_filename = None
-    if 'translated_doc_filename' not in st.session_state:
-        st.session_state.translated_doc_filename = None
-    if 'translated_pdf_filename' not in st.session_state:
-        st.session_state.translated_pdf_filename = None
-
 
     if uploaded_file is not None:
         file_content = uploaded_file.read()  # Read file content as bytes
@@ -284,6 +276,8 @@ def main():
             target_language_name = target_language_tuple[0]  # Get the name
             target_language_code = target_language_tuple[1]
 
+        show_live_translation = st.checkbox("Show Live Translation", value=False)
+
 
         if st.button("Translate"):
             if source_language_name == target_language_name:
@@ -307,6 +301,7 @@ def main():
                     return
 
                 paragraphs = split_into_paragraphs(text)
+                num_paragraphs = len(paragraphs) # Get total paragraphs
                 try:
                     document_summary = generate_summary(text)
                     st.success("Document summary generated.")
@@ -320,10 +315,17 @@ def main():
                 df_data = []
                 translated_paragraphs = []
                 progress_bar = st.progress(0)  # Initialize progress bar
+                start_time = time.time()  # Record start time
+                total_delay = 0 # Initialize total delay
+                estimated_total_time = 0 # Initialize estimated time
+                eta_placeholder = st.empty()  # Placeholder for ETA display
+                live_translation_placeholder = st.empty() # Placeholder for live translation
+
                 for i, paragraph in enumerate(paragraphs):
                     try:
                         # Pass the language *names* to translate_paragraph.
-                        translated_text, status = translate_paragraph(paragraph, source_language_name, target_language_name, document_summary)
+                        translated_text, status, delay = translate_paragraph(paragraph, source_language_name, target_language_name, document_summary)
+                        total_delay += delay
                         df_data.append({
                             "paragraph_id": i + 1,
                             "source_text": paragraph,
@@ -336,9 +338,21 @@ def main():
                         st.error(f"Error: {e}")
                         return
 
-                    # Update progress bar
-                    progress_bar.progress((i + 1) / len(paragraphs))
-                    st.write(f"Translated paragraph {i + 1} of {len(paragraphs)}") # Show progress
+                    # Update progress bar and ETA
+                    progress = (i + 1) / num_paragraphs
+                    progress_bar.progress(progress)
+
+                    if i > 0: # Avoid division by zero on first iteration
+                        elapsed_time = time.time() - start_time
+                        estimated_total_time = elapsed_time * (num_paragraphs / (i+1))
+                        remaining_time = estimated_total_time - elapsed_time
+                        eta_placeholder.write(f"Estimated time remaining: {remaining_time:.2f} seconds")
+
+                    #Show Live Translation
+                    if show_live_translation:
+                        if status == "translated":
+                            live_translation_placeholder.write(f"**Paragraph {i+1}:** {translated_text}")
+
 
                 df = pd.DataFrame(df_data)
                 st.success("Translation complete!")
@@ -377,8 +391,8 @@ def main():
                             paragraph_format = paragraph.paragraph_format # Use paragraph_format
                             paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
-                st.session_state.combined_doc_filename = "combined_translation.docx"
-                combined_doc.save(st.session_state.combined_doc_filename)
+                combined_doc_filename = "combined_translation.docx"
+                combined_doc.save(combined_doc_filename)
 
                 translated_doc = Document()
                 create_header(translated_doc, "Translated with AI, by Yedidya Harris")
@@ -390,55 +404,44 @@ def main():
                     paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
                     translated_doc.add_paragraph("")
 
-                st.session_state.translated_doc_filename = "translated_document.docx"
-                translated_doc.save(st.session_state.translated_doc_filename)
+                translated_doc_filename = "translated_document.docx"
+                translated_doc.save(translated_doc_filename)
 
             # --- PDF Output ---
             with st.spinner("Generating PDF file..."):
-                st.session_state.translated_pdf_filename = "translated_document.pdf"
-                create_pdf_from_paragraphs(translated_paragraphs, st.session_state.translated_pdf_filename, is_rtl=is_target_rtl)
+                translated_pdf_filename = "translated_document.pdf"
+                create_pdf_from_paragraphs(translated_paragraphs, translated_pdf_filename, is_rtl=is_target_rtl)
 
 
             # --- Download Links ---
             st.subheader("Download Files")
-            # Use st.download_button for a cleaner UI, and check if files exist
-            if st.session_state.combined_doc_filename and os.path.exists(st.session_state.combined_doc_filename):
-                with open(st.session_state.combined_doc_filename, "rb") as f:
-                    st.download_button(
-                        label="Download Combined Translation (DOCX)",
-                        data=f,
-                        file_name=st.session_state.combined_doc_filename,
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    )
-            if st.session_state.translated_doc_filename and os.path.exists(st.session_state.translated_doc_filename):
-                with open(st.session_state.translated_doc_filename, "rb") as f:
-                    st.download_button(
-                        label="Download Translated Document (DOCX)",
-                        data=f,
-                        file_name=st.session_state.translated_doc_filename,
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    )
-            if st.session_state.translated_pdf_filename and os.path.exists(st.session_state.translated_pdf_filename):
-                with open(st.session_state.translated_pdf_filename, "rb") as f:
-                    st.download_button(
-                        label="Download Translated Document (PDF)",
-                        data=f,
-                        file_name=st.session_state.translated_pdf_filename,
-                        mime="application/pdf",
-                    )
+            # Use st.download_button for a cleaner UI
+            with open(combined_doc_filename, "rb") as f:
+                st.download_button(
+                    label="Download Combined Translation (DOCX)",
+                    data=f,
+                    file_name=combined_doc_filename,
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            with open(translated_doc_filename, "rb") as f:
+                st.download_button(
+                    label="Download Translated Document (DOCX)",
+                    data=f,
+                    file_name=translated_doc_filename,
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            with open(translated_pdf_filename, "rb") as f:
+                st.download_button(
+                    label="Download Translated Document (PDF)",
+                    data=f,
+                    file_name=translated_pdf_filename,
+                    mime="application/pdf",
+                )
 
-            # Clean up is now handled after the download buttons, and only if the files exist
-            if st.session_state.combined_doc_filename and os.path.exists(st.session_state.combined_doc_filename):
-                os.remove(st.session_state.combined_doc_filename)
-            if st.session_state.translated_doc_filename and os.path.exists(st.session_state.translated_doc_filename):
-                os.remove(st.session_state.translated_doc_filename)
-            if st.session_state.translated_pdf_filename and os.path.exists(st.session_state.translated_pdf_filename):
-                os.remove(st.session_state.translated_pdf_filename)
-
-            # Reset filenames in session state to None after processing and downloading
-            st.session_state.combined_doc_filename = None
-            st.session_state.translated_doc_filename = None
-            st.session_state.translated_pdf_filename = None
+            # Clean up temporary files (optional, but good practice)
+            os.remove(combined_doc_filename)
+            os.remove(translated_doc_filename)
+            os.remove(translated_pdf_filename)
 
 if __name__ == "__main__":
     main()
