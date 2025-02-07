@@ -1,0 +1,6 @@
+streamlit
+google-generativeai
+python-docx
+PyMuPDF  # Use PyMuPDF (fitz) instead of pypdf2
+reportlab
+Pillow
