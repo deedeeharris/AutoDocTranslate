@@ -90,23 +90,27 @@ Here is a summary of the entire document for context:
 Paragraph to translate:
 {paragraph}"""
 
-def translate_paragraph(paragraph, source_language, target_language, document_summary, retries=3, base_delay=2):
-    """Translates a single paragraph using Gemini, with retries and exponential backoff."""
+def translate_paragraph(paragraph, source_language, target_language, document_summary, retries=3, base_delay=0.5):
+    """Translates a single paragraph, with retries and adaptive delay."""
     prompt = create_translation_prompt(source_language, target_language, document_summary, paragraph)
     delay = base_delay
     for attempt in range(retries):
         try:
-            start_time = time.time()  # Time the API call
+            start_time = time.time()
             response = model.generate_content(prompt)
-            end_time = time.time()  # Time the API call
-            api_call_time = end_time - start_time  # Calculate the actual API call time
+            end_time = time.time()
+            api_call_time = end_time - start_time
 
             if response.text:
-                return response.text, "translated", api_call_time  # Return actual API call time
+                #  Calculate next delay: slightly increase if fast, decrease if slow
+                next_delay = delay * (0.8 if api_call_time > delay else 1.2)
+                #  Clamp the delay between 0.2 and 2 seconds
+                next_delay = max(0.2, min(next_delay, 2.0))
+                return response.text, "translated", api_call_time, next_delay
             else:
                 logging.warning(f"Empty response from Gemini on attempt {attempt + 1}.")
                 st.warning(f"Empty response from Gemini on attempt {attempt + 1}.")
-                return "", "failed", delay  # Return the delay (will be base_delay on failure)
+                return "", "failed", delay, base_delay  # Return base_delay on failure
 
         except google_api_exceptions.ClientError as e:
             logging.error(f"Gemini API error on attempt {attempt + 1}: {e}")
@@ -116,11 +120,13 @@ def translate_paragraph(paragraph, source_language, target_language, document_su
             elif e.code == 429 or "Response is blocked" in str(e):
                 st.warning("Rate limit exceeded or response blocked. Waiting before retrying...")
                 logging.warning("Rate limit exceeded or response blocked. Waiting before retrying...")
+                # Use exponential backoff for 429 errors
+                delay *= 2
             elif attempt < retries - 1:
                 st.info(f"Retrying in {delay} seconds...")
                 logging.info(f"Retrying in {delay} seconds...")
             else:
-                return "", "failed", delay  # Return delay even on failure
+                return "", "failed", delay, base_delay  # Return current delay on failure
 
         except Exception as e:
             logging.error(f"Unexpected error on attempt {attempt + 1}: {e}")
@@ -129,13 +135,13 @@ def translate_paragraph(paragraph, source_language, target_language, document_su
                 st.info(f"Retrying in {delay} seconds...")
                 logging.info(f"Retrying in {delay} seconds...")
             else:
-                return "", "failed", delay  # Return delay even on failure
+                return "", "failed", delay, base_delay  # Return current delay on failure
         finally:
             if attempt < retries - 1:
                 time.sleep(delay)
-                delay *= 2  # Exponential backoff
 
-    return "", "failed", 0  # Return 0 delay if all retries fail
+
+    return "", "failed", 0, base_delay  # Return 0 API time and base_delay if all retries fail
 
 
 def generate_summary(text, max_length=500):
@@ -231,7 +237,7 @@ def main():
         # Add a nice image to the sidebar
         try:
             image = Image.open('translator_image.png')  # Replace with your image path
-            st.image(image, caption='AI Translation', use_column_width=True)
+            st.image(image, caption='AI Translation', use_container_width=True) #use container width
         except FileNotFoundError:
             st.warning("Image file not found.  Please add translator_image.png to your project.")
 
@@ -298,6 +304,7 @@ def main():
                 paragraphs = split_into_paragraphs(text)
                 num_paragraphs = len(paragraphs)
                 try:
+                    #  Call generate_summary *before* the translation loop
                     document_summary = generate_summary(text)
                     st.success("Document summary generated.")
                     with st.expander("Show Summary"):
@@ -305,17 +312,22 @@ def main():
                 except ValueError as e:
                     st.error(f"Error: {e}")
                     return
+                except Exception as e: # Catch other exceptions during summary
+                    st.error(f"Error generating summary: {e}")
+                    return
+
 
             with st.spinner("Translating..."):
                 df_data = []
                 translated_paragraphs = []
-                start_time = time.time()  # Record start time OUTSIDE the loop
-                total_api_time = 0  # Accumulate API call times
+                start_time = time.time()
+                total_api_time = 0
+                next_delay = 8  # Initial delay for the first paragraph
 
                 for i, paragraph in enumerate(paragraphs):
                     try:
-                        translated_text, status, api_call_time = translate_paragraph(paragraph, source_language_name, target_language_name, document_summary)
-                        total_api_time += api_call_time  # Accumulate API time
+                        translated_text, status, api_call_time, next_delay = translate_paragraph(paragraph, source_language_name, target_language_name, document_summary, base_delay=next_delay)
+                        total_api_time += api_call_time
 
                         df_data.append({
                             "paragraph_id": i + 1,
@@ -329,13 +341,12 @@ def main():
                         st.error(f"Error: {e}")
                         return
 
-                    # --- Progress Bar and ETA Calculation (Improved) ---
                     progress = (i + 1) / num_paragraphs
                     progress_bar.progress(progress)
 
-                    if i > 0:  # Avoid division by zero
+                    if i > 0:
                         elapsed_time = time.time() - start_time
-                        estimated_total_time = (total_api_time / progress)  # Use total API time
+                        estimated_total_time = (total_api_time / progress)
                         remaining_time = estimated_total_time - elapsed_time
                         eta_placeholder.write(f"Estimated time remaining: {remaining_time:.2f} seconds")
 
