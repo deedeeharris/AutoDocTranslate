@@ -8,12 +8,8 @@ from docx.shared import Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_PARAGRAPH_ALIGNMENT
 from docx.oxml.shared import OxmlElement, qn
 import fitz  # PyMuPDF
-#from google.colab import files # REMOVE: No longer needed in Streamlit
-from IPython.display import display, HTML, clear_output #REMOVE
 import logging
 import streamlit as st # ADDED
-#import ipywidgets as widgets # REMOVE: Not needed in Streamlit
-#from ipywidgets import Dropdown, Button, HBox, VBox, Layout # REMOVE
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
