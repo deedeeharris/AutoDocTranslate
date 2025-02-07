@@ -21,28 +21,6 @@ from google.api_core import exceptions as google_api_exceptions
 from PIL import Image
 
 
-# --- Configuration and Model Setup ---
-# Use Streamlit secrets for API key management
-# --- API Key Logic ---
-if api_key_input:
-    api_key_to_use = api_key_input
-    st.sidebar.success("Using entered API key.")  # Optional: feedback
-else:
-    api_key_to_use = st.secrets["GEMINI_API_KEY"]
-    st.sidebar.info("Using API key from secrets.")  # Optional: feedback
-genai.configure(api_key=GEMINI_API_KEY)
-
-generation_config = {
-  "temperature": 0.1,  # More deterministic, less "creative"
-  "top_p": 0.95,
-  "top_k": 64,
-  "max_output_tokens": 8192,
-}
-
-model = genai.GenerativeModel(
-  model_name="gemini-2.0-pro-exp-02-05",
-  generation_config=generation_config,
-)
 
 # --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -236,6 +214,28 @@ def main():
             st.warning("Image file not found.  Please add translator_image.png to your project.")
 
 
+    # --- Configuration and Model Setup ---
+    # Use Streamlit secrets for API key management
+    # --- API Key Logic ---
+    if api_key_input:
+        api_key_to_use = api_key_input
+        st.sidebar.success("Using entered API key.")  # Optional: feedback
+    else:
+        api_key_to_use = st.secrets["GEMINI_API_KEY"]
+        st.sidebar.info("Using API key from secrets.")  # Optional: feedback
+    genai.configure(api_key=GEMINI_API_KEY)
+    
+    generation_config = {
+      "temperature": 0.1,  # More deterministic, less "creative"
+      "top_p": 0.95,
+      "top_k": 64,
+      "max_output_tokens": 8192,
+    }
+    
+    model = genai.GenerativeModel(
+      model_name="gemini-2.0-pro-exp-02-05",
+      generation_config=generation_config,
+    )
     # --- Main Content Area ---
     st.title("AI Document Translator")
     st.write("Upload a .docx or .pdf file to begin.")
