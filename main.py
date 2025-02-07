@@ -114,9 +114,10 @@ def translate_paragraph(paragraph, source_language, target_language, document_su
     return "", "failed", 0  # Return 0 delay if all retries fail
 
 
-def generate_summary(text, max_length=500):
-    """Generates a summary of the document using Gemini."""
-    prompt = f"Summarize the following text (not in markdown) in no more than {max_length} characters:\n\n{text}"
+def generate_summary(text, target_language, max_length=700):
+    """Generates a summary of the document using Gemini in the target language."""
+    prompt = f"""Summarize the following text in {target_language} (not in markdown) in no more than {max_length} characters:\n\n{text}"""
+
     try:
         response = model.generate_content(prompt)
         return response.text if response.text else "Summary generation failed."
@@ -309,9 +310,9 @@ def main():
                 paragraphs = split_into_paragraphs(text)
                 num_paragraphs = len(paragraphs)
                 try:
-                    document_summary = generate_summary(text)
-                    st.success("Document summary generated.")
-                    with st.expander("Show Summary"):
+                    document_summary = generate_summary(text, target_language_name)
+                    st.success(f"Document summary generated in {target_language_name}.")
+                    with st.expander("Show Summary in Target Language"):
                         st.write(document_summary)
                 except ValueError as e:
                     st.error(f"Error: {e}")
