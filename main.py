@@ -244,6 +244,11 @@ def main():
     st.title("AI Document Translator")
     st.write("Upload a .docx or .pdf file to begin.")
 
+    # --- Placeholders OUTSIDE of any columns or spinners ---
+    progress_bar = st.progress(0)  # Initialize progress bar
+    eta_placeholder = st.empty()  # Placeholder for ETA display
+    live_translation_placeholder = st.empty()  # Placeholder for live translation
+
     uploaded_file = st.file_uploader("Choose a file", type=["docx", "pdf"])
 
     if uploaded_file is not None:
@@ -311,21 +316,14 @@ def main():
                     st.error(f"Error: {e}")
                     return
 
-            #Move these lines *before* the `with st.spinner("Translating...")` block:
-            progress_bar = st.progress(0)  # Initialize progress bar
-            start_time = time.time()  # Record start time
-            eta_placeholder = st.empty()  # Placeholder for ETA display
-            live_translation_placeholder = st.empty() # Placeholder for live translation
 
             with st.spinner("Translating..."):
                 df_data = []
                 translated_paragraphs = []
-                # progress_bar = st.progress(0)  # Initialize progress bar  <- REMOVE
-                # start_time = time.time()  # Record start time <- REMOVE
+                start_time = time.time()  # Record start time
                 total_delay = 0 # Initialize total delay
                 estimated_total_time = 0 # Initialize estimated time
-                # eta_placeholder = st.empty()  # Placeholder for ETA display <- REMOVE
-                # live_translation_placeholder = st.empty() # Placeholder for live translation <- REMOVE
+
 
                 for i, paragraph in enumerate(paragraphs):
                     try:
@@ -346,18 +344,18 @@ def main():
 
                     # Update progress bar and ETA
                     progress = (i + 1) / num_paragraphs
-                    progress_bar.progress(progress)
+                    progress_bar.progress(progress)  # Use the OUTSIDE placeholder
 
                     if i > 0: # Avoid division by zero on first iteration
                         elapsed_time = time.time() - start_time
                         estimated_total_time = elapsed_time * (num_paragraphs / (i+1))
                         remaining_time = estimated_total_time - elapsed_time
-                        eta_placeholder.write(f"Estimated time remaining: {remaining_time:.2f} seconds")
+                        eta_placeholder.write(f"Estimated time remaining: {remaining_time:.2f} seconds") # Use the OUTSIDE placeholder
 
                     #Show Live Translation
                     if show_live_translation:
                         if status == "translated":
-                            live_translation_placeholder.write(f"**Paragraph {i+1}:** {translated_text}")
+                            live_translation_placeholder.write(f"**Paragraph {i+1}:** {translated_text}")  # Use the OUTSIDE placeholder
 
 
                 df = pd.DataFrame(df_data)
