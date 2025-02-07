@@ -179,6 +179,23 @@ def create_pdf_from_paragraphs(paragraphs, filename, is_rtl=False):
     doc.addPageTemplates([page_template])
     doc.build(elements)
 
+# --- Configuration and Model Setup ---
+def configure_gemini(api_key):
+    """Configures the Gemini AI model."""
+    genai.configure(api_key=api_key)
+    
+    generation_config = {
+        "temperature": 0.1,  # More deterministic, less "creative"
+        "top_p": 0.95,
+        "top_k": 64,
+        "max_output_tokens": 8192,
+    }
+    
+    model = genai.GenerativeModel(
+        model_name="gemini-2.0-pro-exp-02-05",
+        generation_config=generation_config,
+    )
+    return model
 
 # --- Streamlit UI ---
 
@@ -223,19 +240,13 @@ def main():
     else:
         api_key_to_use = st.secrets["GEMINI_API_KEY"]
         st.sidebar.info("Using API key from secrets.")  # Optional: feedback
-    genai.configure(api_key=api_key_to_use)
     
-    generation_config = {
-      "temperature": 0.1,  # More deterministic, less "creative"
-      "top_p": 0.95,
-      "top_k": 64,
-      "max_output_tokens": 8192,
-    }
+    # **Initialize the Gemini model globally**
+    global model  
+    model = configure_gemini(api_key_to_use)
     
-    model = genai.GenerativeModel(
-      model_name="gemini-2.0-pro-exp-02-05",
-      generation_config=generation_config,
-    )
+
+    
     # --- Main Content Area ---
     st.title("AI Document Translator")
     st.write("Upload a .docx or .pdf file to begin.")
