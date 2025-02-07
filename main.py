@@ -4,12 +4,16 @@ import time
 import google.generativeai as genai
 import pandas as pd
 from docx import Document
-from docx.shared import Inches, Pt
+from docx.shared import Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_PARAGRAPH_ALIGNMENT
 from docx.oxml.shared import OxmlElement, qn
 import fitz  # PyMuPDF
+#from google.colab import files # REMOVE: No longer needed in Streamlit
+from IPython.display import display, HTML, clear_output #REMOVE
 import logging
-import streamlit as st
+import streamlit as st # ADDED
+#import ipywidgets as widgets # REMOVE: Not needed in Streamlit
+#from ipywidgets import Dropdown, Button, HBox, VBox, Layout # REMOVE
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
@@ -18,43 +22,43 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT, TA_CENTER, TA_RIGHT
 from google.api_core import exceptions as google_api_exceptions
-from PIL import Image
 
-
-# --- Configuration and Model Setup ---
-# Use Streamlit secrets for API key management
-GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+# --- API Key Handling (Streamlit Secrets) ---
+GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    st.error("Please configure your Gemini API key in Streamlit Secrets.")
+    st.stop()
 
 genai.configure(api_key=GEMINI_API_KEY)
 
+# --- Generation Config, Model, Logging (same as before) ---
 generation_config = {
-  "temperature": 0.1,  # More deterministic, less "creative"
+  "temperature": 0,
   "top_p": 0.95,
   "top_k": 64,
   "max_output_tokens": 8192,
 }
 
 model = genai.GenerativeModel(
-  model_name="gemini-pro",  # Use the standard gemini-pro model
+  model_name="gemini-2.0-pro-exp-02-05",
   generation_config=generation_config,
 )
 
-# --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- Helper Functions ---
+# --- Helper Functions (same as before, but remove Colab-specific parts) ---
+# ... (All your helper functions: create_header, extract_text_from_docx, etc.) ...
+#   - Remove any calls to `files.upload()` or `display()` from IPython.
+#   - Keep the PDF and DOCX generation functions.
 
 def create_header(document, text):
-    """Adds a header to each page of a docx document."""
     for section in document.sections:
         header = section.header
         paragraph = header.paragraphs[0]
         paragraph.text = text
-        paragraph_format = paragraph.paragraph_format  # Use paragraph_format for alignment
-        paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
 def extract_text_from_docx(docx_bytes):
-    """Extracts text from a .docx file."""
     try:
         doc = Document(io.BytesIO(docx_bytes))
         full_text = []
@@ -63,11 +67,9 @@ def extract_text_from_docx(docx_bytes):
         return "\n\n".join(full_text)
     except Exception as e:
         logging.error(f"Error extracting text from DOCX: {e}")
-        st.error(f"Error extracting text from DOCX: {e}")  # Display error in Streamlit
         return ""
 
 def extract_text_from_pdf(pdf_bytes):
-    """Extracts text from a .pdf file using PyMuPDF."""
     text = ""
     try:
         with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
@@ -76,18 +78,16 @@ def extract_text_from_pdf(pdf_bytes):
         return text
     except Exception as e:
         logging.error(f"Error extracting text from PDF: {e}")
-        st.error(f"Error extracting text from PDF: {e}") # Display error in Streamlit
         return ""
 
 def split_into_paragraphs(text):
-    """Splits text into paragraphs based on double newlines."""
     paragraphs = text.split("\n\n")
     return [p.strip() for p in paragraphs if p.strip()]
 
 def create_translation_prompt(source_language, target_language, document_summary, paragraph):
-    """Creates the translation prompt for Gemini."""
+    prompt = f"""You are a professional translator... (rest of prompt)"""
     prompt = f"""You are a professional translator. Translate the following paragraph from {source_language} to {target_language}.
-Maintain the original meaning and tone as closely as possible.  Be as accurate as possible.
+Maintain the original meaning and tone as closely as possible.
 
 Here is a summary of the entire document for context:
 {document_summary}
@@ -96,8 +96,7 @@ Paragraph to translate:
 {paragraph}"""
     return prompt
 
-def translate_paragraph(paragraph, source_language, target_language, document_summary, retries=3, delay=5):
-    """Translates a single paragraph using Gemini, with retries and delay."""
+def translate_paragraph(paragraph, source_language, target_language, document_summary, retries=3, delay=10):
     prompt = create_translation_prompt(source_language, target_language, document_summary, paragraph)
 
     for attempt in range(retries):
@@ -105,64 +104,54 @@ def translate_paragraph(paragraph, source_language, target_language, document_su
             response = model.generate_content(prompt)
             if response.text:
                 return response.text, "translated"
+            # ... (rest of error handling) ...
             else:
                 logging.warning(f"Empty response from Gemini on attempt {attempt + 1}.")
-                st.warning(f"Empty response from Gemini on attempt {attempt + 1}.") # Display warning
                 return "", "failed"
-        except google_api_exceptions.ClientError as e:
+        except google_api_exceptions.ClientError as e:  # Catch Google API Client Errors
             logging.error(f"Gemini API error on attempt {attempt + 1}: {e}")
-            st.error(f"Gemini API error on attempt {attempt + 1}: {e}") # Display error
             if e.code == 400 and "API key not valid" in str(e):
-                raise ValueError("Invalid API Key provided.") from e
+                raise ValueError("Invalid API Key provided.") from e # Re-raise as ValueError for clarity
             elif e.code == 429 or "Response is blocked" in str(e):
-                st.warning("Rate limit exceeded or response blocked. Waiting before retrying...") # Display warning
                 logging.warning("Rate limit exceeded or response blocked. Waiting before retrying...")
             elif attempt < retries - 1:
-                st.info(f"Retrying in {delay} seconds...") # Display info
                 logging.info(f"Retrying in {delay} seconds...")
             else:
                 return "", "failed"
         except Exception as e:
             logging.error(f"Unexpected error on attempt {attempt + 1}: {e}")
-            st.error(f"Unexpected error on attempt {attempt + 1}: {e}") # Display error
             if attempt < retries - 1:
-                st.info(f"Retrying in {delay} seconds...") # Display info
                 logging.info(f"Retrying in {delay} seconds...")
             else:
                 return "", "failed"
         finally:
-            if attempt < retries - 1:
+            if attempt < retries - 1:  # Only sleep if it's *not* the last attempt.
                 time.sleep(delay)
 
-    return "", "failed"
+    return "", "failed"  # Return failure only after all retries
 
 def generate_summary(text, max_length=500):
-    """Generates a summary of the document using Gemini."""
+    prompt = f"Summarize the following text... (rest of prompt)"
     prompt = f"Summarize the following text (not in markdown) in no more than {max_length} characters:\n\n{text}"
     try:
-        response = model.generate_content(prompt)
+        response = model.generate_content(prompt) # Use generate_content
         return response.text if response.text else "Summary generation failed."
     except google_api_exceptions.ClientError as e:
         logging.error(f"Error generating summary: {e}")
-        st.error(f"Error generating summary: {e}") # Display error
         if e.code == 400 and "API key not valid" in str(e):
             raise ValueError("Invalid API Key provided.") from e
         return "Summary generation failed."
     except Exception as e:
         logging.error(f"Error generating summary: {e}")
-        st.error(f"Error generating summary: {e}") # Display error
         return "Summary generation failed."
 
 def set_paragraph_rtl(paragraph):
-    """Sets the paragraph direction to Right-to-Left."""
     pPr = paragraph._element.get_or_add_pPr()
     bidi = OxmlElement('w:bidi')
     pPr.append(bidi)
-    paragraph_format = paragraph.paragraph_format # Use paragraph_format
-    paragraph_format.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
+    paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
 
 def set_table_rtl(table):
-    """Sets the table direction to Right-to-Left."""
     tbl = table._tbl
     tblPr = tbl.tblPr
     if tblPr is None:
@@ -171,22 +160,98 @@ def set_table_rtl(table):
     bidi_visual = OxmlElement('w:bidiVisual')
     tblPr.append(bidi_visual)
 
+class MyTable(Table):  # No changes needed here
+    def wrapOn(self, canv, availWidth, availHeight):
+        # Call the original wrapOn method to do the initial calculations.
+        width, height = Table.wrapOn(self, canv, availWidth, availHeight)
+        # Store the calculated height.  We'll use this later.
+        self.calculated_height = height
+        return width, height
+
+def create_pdf_with_table(df, filename, is_rtl=False):
+    doc = SimpleDocTemplate(filename, pagesize=A4)
+    elements = []
+
+    styles = getSampleStyleSheet()
+    table_cell_style = ParagraphStyle(
+        name='TableCellStyle',
+        parent=styles['Normal'],
+        fontSize=6,
+        leading=6,
+        alignment=TA_JUSTIFY,
+        spaceBefore=0,
+        spaceAfter=0,
+    )
+
+    data = [['Paragraph ID', 'Source Text', 'Target Text']]
+    for index, row in df.iterrows():
+        # Conditional alignment based on line count
+        source_lines = row['source_text'].count('\n') + 1
+        target_lines = row['target_text'].count('\n') + 1
+
+        source_alignment = TA_LEFT if source_lines < 3 else TA_JUSTIFY
+        target_alignment = TA_RIGHT if (is_rtl and target_lines < 3) else (TA_LEFT if target_lines < 3 else TA_JUSTIFY)
+
+
+        wrapped_row = [
+            Paragraph(str(row['paragraph_id']), table_cell_style),
+            Paragraph(str(row['source_text']), ParagraphStyle(name='SourceStyle', parent=table_cell_style, alignment=source_alignment)),
+            Paragraph(str(row['target_text']), ParagraphStyle(name='TargetStyle', parent=table_cell_style, alignment=target_alignment)),
+        ]
+        data.append(wrapped_row)
+
+    table = Table(data, colWidths=[0.7*inch, 3*inch, 3*inch])
+    style = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),
+        ('FONTSIZE', (0,0), (-1,-1), 10),
+        ('PADDING', (0, 0), (-1, -1), 0),
+    ])
+    if is_rtl:
+        style.add('RTL', (0, 0), (-1, -1))
+    table.setStyle(style)
+    elements.append(table)
+
+    def header_footer(canvas, doc):
+        canvas.saveState()
+        styles = getSampleStyleSheet()
+        header = Paragraph("Translated with AI, by Yedidya Harris", styles['Normal'])
+        header.wrapOn(canvas, doc.width, doc.topMargin)
+        header.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - header.height)
+        canvas.restoreState()
+
+    page_template = PageTemplate(id='basic', frames=[Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height)], onPage=header_footer)
+    doc.addPageTemplates([page_template])
+    doc.build(elements)
+
 def create_pdf_from_paragraphs(paragraphs, filename, is_rtl=False):
-    """Creates a PDF from a list of paragraphs, with justification and header."""
     doc = SimpleDocTemplate(filename, pagesize=A4)
     elements = []
 
     styles = getSampleStyleSheet()
     style = styles["Normal"]
-    style.alignment = TA_JUSTIFY
-    if is_rtl:
-        style.alignment = TA_RIGHT
-        style.firstLineIndent = 0
-        style.rightIndent = 0
 
     for para_text in paragraphs:
+        # Count lines in the paragraph
+        num_lines = para_text.count('\n') + 1
+
+        # Set alignment based on line count and RTL
+        if is_rtl:
+            alignment = TA_RIGHT if num_lines < 3 else TA_JUSTIFY
+        else:
+            alignment = TA_LEFT if num_lines < 3 else TA_JUSTIFY
+
+        style.alignment = alignment  # Set the calculated alignment
         p = Paragraph(para_text, style)
         elements.append(p)
+
         available_height = doc.height - doc.bottomMargin - doc.topMargin
         if elements:
             y = elements[-1].getSpaceAfter()
@@ -207,209 +272,170 @@ def create_pdf_from_paragraphs(paragraphs, filename, is_rtl=False):
     doc.addPageTemplates([page_template])
     doc.build(elements)
 
-
-# --- Streamlit UI ---
+# --- Main Application Logic (Streamlit Version) ---
 
 def main():
-    """Main function to run the Streamlit translation application."""
+    st.title("Document Translator")
 
-    st.set_page_config(page_title="AI Document Translator", page_icon=":globe_with_meridians:", layout="wide")
+    # 1. File Upload
+    uploaded_file = st.file_uploader("Upload a .docx or .pdf file", type=["docx", "pdf"])
+    if uploaded_file is None:
+        st.stop()
 
-    # --- Sidebar for Instructions and Information ---
-    with st.sidebar:
-        st.title("About")
-        st.markdown(
-            "This app translates documents using Google's Gemini Pro model.  It supports `.docx` and `.pdf` files."
-            " Upload your file, select the source and target languages, and click 'Translate'."
-            " The app provides both a combined (source/target) and a translated-only version of your document."
-        )
-        st.markdown("---")
-        st.markdown("**Developed by Yedidya Harris**")
-        st.markdown(
-            "This is a demonstration project and may have limitations.  For critical translations, always consult a professional human translator."
-        )
-        st.markdown("---")
-        st.markdown("**Language Support:**")
-        st.markdown("The app supports a wide range of languages.  If you encounter any issues with a specific language, please let me know.")
+    # 2. Language Selection
+    language_options = [
+        ('English', 'en'), ('Spanish', 'es'), ('French', 'fr'), ('German', 'de'),
+        ('Chinese (Simplified)', 'zh-CN'), ('Chinese (Traditional)', 'zh-TW'),
+        ('Japanese', 'ja'), ('Korean', 'ko'), ('Russian', 'ru'),
+        ('Arabic', 'ar'), ('Hebrew', 'he'), ('Portuguese', 'pt'),
+        ('Italian', 'it'), ('Dutch', 'nl'), ('Swedish', 'sv'),
+        ('Norwegian', 'no'), ('Danish', 'da'), ('Finnish', 'fi'),
+        ('Turkish', 'tr'), ('Indonesian', 'id'), ('Vietnamese', 'vi'),
+        ('Greek', 'el'), ('Polish', 'pl'), ('Czech', 'cs'),
+        ('Hungarian', 'hu'), ('Romanian', 'ro'), ('Thai', 'th'),
+        ('Hindi', 'hi')
+    ]
+    col1, col2 = st.columns(2)
+    with col1:
+      source_language = st.selectbox("Source Language", options=[lang[0] for lang in language_options], index=0, key="source_lang")
+    with col2:
+      target_language = st.selectbox("Target Language", options=[lang[0] for lang in language_options], index=0, key = "target_lang")
 
-        # Add a nice image to the sidebar
-        try:
-            image = Image.open('translator_image.png')  # Replace with your image path
-            st.image(image, caption='AI Translation', use_column_width=True)
-        except FileNotFoundError:
-            st.warning("Image file not found.  Please add translator_image.png to your project.")
+    source_language_code = [lang[1] for lang in language_options if lang[0] == source_language][0]
+    target_language_code = [lang[1] for lang in language_options if lang[0] == target_language][0]
 
+    is_target_rtl = target_language_code.lower() in ['he', 'ar', 'fa', 'ur', 'yi']
 
-    # --- Main Content Area ---
-    st.title("AI Document Translator")
-    st.write("Upload a .docx or .pdf file to begin.")
+    if st.button("Translate"):
+        with st.spinner("Translating..."):
+            # 3. Document Preprocessing
+            file_content = uploaded_file.read()  # Read file content as bytes
+            filename = uploaded_file.name
 
-    uploaded_file = st.file_uploader("Choose a file", type=["docx", "pdf"])
+            if filename.endswith(".docx"):
+                text = extract_text_from_docx(file_content)
+            elif filename.endswith(".pdf"):
+                text = extract_text_from_pdf(file_content)
+            else:
+                st.error("Unsupported file type.")
+                st.stop()
 
-    if uploaded_file is not None:
-        file_content = uploaded_file.read()  # Read file content as bytes
-        filename = uploaded_file.name
+            if not text:
+                st.error("Could not extract text from the document.")
+                st.stop()
 
-        language_options = [
-            ('English', 'en'), ('Spanish', 'es'), ('French', 'fr'), ('German', 'de'),
-            ('Chinese (Simplified)', 'zh-CN'), ('Chinese (Traditional)', 'zh-TW'),
-            ('Japanese', 'ja'), ('Korean', 'ko'), ('Russian', 'ru'),
-            ('Arabic', 'ar'), ('Hebrew', 'he'), ('Portuguese', 'pt'),
-            ('Italian', 'it'), ('Dutch', 'nl'), ('Swedish', 'sv'),
-            ('Norwegian', 'no'), ('Danish', 'da'), ('Finnish', 'fi'),
-            ('Turkish', 'tr'), ('Indonesian', 'id'), ('Vietnamese', 'vi'),
-            ('Greek', 'el'), ('Polish', 'pl'), ('Czech', 'cs'),
-            ('Hungarian', 'hu'), ('Romanian', 'ro'), ('Thai', 'th'),
-            ('Hindi', 'hi')
-        ]
+            paragraphs = split_into_paragraphs(text)
+            try:
+                document_summary = generate_summary(text)
+                st.write("Document Summary:")
+                st.write(document_summary)
+            except ValueError as e:
+                st.error(f"Error: {e}")
+                st.stop()
 
-        col1, col2 = st.columns(2)  # Use columns for better layout
-        with col1:
-            source_language = st.selectbox("Source Language", options=language_options, format_func=lambda x: x[0], key="source_lang")
-        with col2:
-            target_language = st.selectbox("Target Language", options=language_options, format_func=lambda x: x[0], key="target_lang")
-
-        if st.button("Translate"):
-            if source_language == target_language:
-                st.error("Source and target languages cannot be the same.")
-                return
-
-            is_target_rtl = target_language[1].lower() in ['he', 'ar', 'fa', 'ur', 'yi']
-
-            with st.spinner("Processing document..."):
-                if filename.endswith(".docx"):
-                    text = extract_text_from_docx(file_content)
-                elif filename.endswith(".pdf"):
-                    text = extract_text_from_pdf(file_content)
-                else:
-                    st.error("Unsupported file type.")
-                    return
-
-                if not text:
-                    st.error("Could not extract text from the document.")
-                    return
-
-                paragraphs = split_into_paragraphs(text)
+            # 4. Translation
+            df_data = []
+            translated_paragraphs = []
+            for i, paragraph in enumerate(paragraphs):
                 try:
-                    document_summary = generate_summary(text)
-                    st.success("Document summary generated.")
-                    with st.expander("Show Summary"):
-                        st.write(document_summary)
+                    translated_text, status = translate_paragraph(paragraph, source_language_code, target_language_code, document_summary)
+                    df_data.append({
+                        "paragraph_id": i + 1,
+                        "source_text": paragraph,
+                        "target_text": translated_text,
+                        "status": status
+                    })
+                    if status == "translated":
+                        translated_paragraphs.append(translated_text)
                 except ValueError as e:
                     st.error(f"Error: {e}")
-                    return
+                    st.stop()
 
-            with st.spinner("Translating..."):
-                df_data = []
-                translated_paragraphs = []
-                progress_bar = st.progress(0)  # Initialize progress bar
-                for i, paragraph in enumerate(paragraphs):
-                    try:
-                        translated_text, status = translate_paragraph(paragraph, source_language[1], target_language[1], document_summary)
-                        df_data.append({
-                            "paragraph_id": i + 1,
-                            "source_text": paragraph,
-                            "target_text": translated_text,
-                            "status": status
-                        })
-                        if status == "translated":
-                            translated_paragraphs.append(translated_text)
-                    except ValueError as e:
-                        st.error(f"Error: {e}")
-                        return
+                st.write(f"Translated paragraph {i + 1} of {len(paragraphs)}")
 
-                    # Update progress bar
-                    progress_bar.progress((i + 1) / len(paragraphs))
-                    st.write(f"Translated paragraph {i + 1} of {len(paragraphs)}") # Show progress
+            df = pd.DataFrame(df_data)
 
-                df = pd.DataFrame(df_data)
-                st.success("Translation complete!")
-
-            # --- Display Results ---
-            st.subheader("Translation Results")
-            with st.expander("Show Full Translation Table"):
-                st.dataframe(df)  # Display the DataFrame
-
+            # 5. Output Generation (same as before, but use BytesIO for downloads)
             # --- DOCX Output ---
-            with st.spinner("Generating DOCX files..."):
-                combined_doc = Document()
-                create_header(combined_doc, "Translated with AI, by Yedidya Harris")
-                table = combined_doc.add_table(rows=1, cols=3)
-                table.style = 'Table Grid'
-                hdr_cells = table.rows[0].cells
-                hdr_cells[0].text = 'Paragraph ID'
-                hdr_cells[1].text = 'Source Text'
-                hdr_cells[2].text = 'Target Text'
+            combined_doc = Document()
+            create_header(combined_doc, "Translated with AI, by Yedidya Harris")
+            table = combined_doc.add_table(rows=1, cols=3)
+            table.style = 'Table Grid'
+            hdr_cells = table.rows[0].cells
+            hdr_cells[0].text = 'Paragraph ID'
+            hdr_cells[1].text = 'Source Text'
+            hdr_cells[2].text = 'Target Text'
 
-                if is_target_rtl:
-                    set_table_rtl(table)
+            if is_target_rtl:
+                set_table_rtl(table)
 
-                for index, row in df.iterrows():
-                    row_cells = table.add_row().cells
-                    row_cells[0].text = str(row['paragraph_id'])
-                    row_cells[1].text = row['source_text']
-                    row_cells[2].text = row['target_text']
-                    if is_target_rtl:
-                        for paragraph in row_cells[2].paragraphs:
+            for index, row in df.iterrows():
+                row_cells = table.add_row().cells
+                row_cells[0].text = str(row['paragraph_id'])
+                row_cells[1].text = row['source_text']
+                row_cells[2].text = row['target_text']
+
+                # Conditional Justification for DOCX (Table)
+                for i, cell_text in enumerate([row['source_text'], row['target_text']]):
+                    num_lines = cell_text.count('\n') + 1
+                    if i == 0:  # Source Text
+                        alignment = WD_ALIGN_PARAGRAPH.LEFT if num_lines < 3 else WD_ALIGN_PARAGRAPH.JUSTIFY
+                    else:  # Target Text
+                        if is_target_rtl:
+                            alignment = WD_ALIGN_PARAGRAPH.RIGHT if num_lines < 3 else WD_ALIGN_PARAGRAPH.JUSTIFY
+                        else:
+                            alignment = WD_ALIGN_PARAGRAPH.LEFT if num_lines < 3 else WD_ALIGN_PARAGRAPH.JUSTIFY
+
+                    for paragraph in row_cells[i+1].paragraphs:
+                        paragraph.alignment = alignment
+                        if is_target_rtl and i == 1: # Apply RTL if needed
                             set_paragraph_rtl(paragraph)
-                            paragraph_format = paragraph.paragraph_format # Use paragraph_format
-                            paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-                    else:
-                        for paragraph in row_cells[2].paragraphs:
-                            paragraph_format = paragraph.paragraph_format # Use paragraph_format
-                            paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
-                combined_doc_filename = "combined_translation.docx"
-                combined_doc.save(combined_doc_filename)
+            # Save to BytesIO object
+            combined_doc_bytes = io.BytesIO()
+            combined_doc.save(combined_doc_bytes)
+            combined_doc_bytes.seek(0)  # Important: Reset stream position to the beginning
 
-                translated_doc = Document()
-                create_header(translated_doc, "Translated with AI, by Yedidya Harris")
-                for paragraph_text in translated_paragraphs:
-                    paragraph = translated_doc.add_paragraph(paragraph_text)
-                    if is_target_rtl:
-                        set_paragraph_rtl(paragraph)
-                    paragraph_format = paragraph.paragraph_format # Use paragraph_format
-                    paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-                    translated_doc.add_paragraph("")
 
-                translated_doc_filename = "translated_document.docx"
-                translated_doc.save(translated_doc_filename)
+            translated_doc = Document()
+            create_header(translated_doc, "Translated with AI, by Yedidya Harris")
+            for paragraph_text in translated_paragraphs:
+                # Conditional Justification for DOCX (Translated Document)
+                num_lines = paragraph_text.count('\n') + 1
+                if is_target_rtl:
+                    alignment = WD_ALIGN_PARAGRAPH.RIGHT if num_lines < 3 else WD_ALIGN_PARAGRAPH.JUSTIFY
+                else:
+                    alignment = WD_ALIGN_PARAGRAPH.LEFT if num_lines < 3 else WD_ALIGN_PARAGRAPH.JUSTIFY
+
+                paragraph = translated_doc.add_paragraph(paragraph_text)
+                paragraph.alignment = alignment
+                if is_target_rtl:
+                    set_paragraph_rtl(paragraph)
+                translated_doc.add_paragraph("")  # Two line breaks
+                translated_doc.add_paragraph("")
+
+            # Save to BytesIO object
+            translated_doc_bytes = io.BytesIO()
+            translated_doc.save(translated_doc_bytes)
+            translated_doc_bytes.seek(0)
 
             # --- PDF Output ---
-            with st.spinner("Generating PDF file..."):
-                translated_pdf_filename = "translated_document.pdf"
-                create_pdf_from_paragraphs(translated_paragraphs, translated_pdf_filename, is_rtl=is_target_rtl)
+            combined_pdf_bytes = io.BytesIO()
+            create_pdf_with_table(df, combined_pdf_bytes, is_rtl=is_target_rtl)
+            combined_pdf_bytes.seek(0)
 
+            translated_pdf_bytes = io.BytesIO()
+            create_pdf_from_paragraphs(translated_paragraphs, translated_pdf_bytes, is_rtl=is_target_rtl)
+            translated_pdf_bytes.seek(0)
 
-            # --- Download Links ---
-            st.subheader("Download Files")
-            # Use st.download_button for a cleaner UI
-            with open(combined_doc_filename, "rb") as f:
-                st.download_button(
-                    label="Download Combined Translation (DOCX)",
-                    data=f,
-                    file_name=combined_doc_filename,
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                )
-            with open(translated_doc_filename, "rb") as f:
-                st.download_button(
-                    label="Download Translated Document (DOCX)",
-                    data=f,
-                    file_name=translated_doc_filename,
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                )
-            with open(translated_pdf_filename, "rb") as f:
-                st.download_button(
-                    label="Download Translated Document (PDF)",
-                    data=f,
-                    file_name=translated_pdf_filename,
-                    mime="application/pdf",
-                )
+            # 6. Download Links (Streamlit Version)
+            st.download_button("Download Combined Translation (DOCX)", data=combined_doc_bytes, file_name="combined_translation.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            st.download_button("Download Translated Document (DOCX)", data=translated_doc_bytes, file_name="translated_document.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            st.download_button("Download Combined Translation (PDF)", data=combined_pdf_bytes, file_name="combined_translation.pdf", mime="application/pdf")
+            st.download_button("Download Translated Document (PDF)", data=translated_pdf_bytes, file_name="translated_document.pdf", mime="application/pdf")
 
-            # Clean up temporary files (optional, but good practice)
-            os.remove(combined_doc_filename)
-            os.remove(translated_doc_filename)
-            os.remove(translated_pdf_filename)
+            st.success("Translation complete!")
+            st.dataframe(df)
 
 if __name__ == "__main__":
     main()
