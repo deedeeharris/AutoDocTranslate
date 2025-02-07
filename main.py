@@ -85,7 +85,7 @@ def split_into_paragraphs(text):
     return [p.strip() for p in paragraphs if p.strip()]
 
 def create_translation_prompt(source_language, target_language, document_summary, paragraph):
-    """Creates the translation prompt for Gemini."""
+    """Creates the translation prompt for Gemini.  Now uses full language names."""
     prompt = f"""You are a professional translator. Translate the following paragraph from {source_language} to {target_language}.
 Maintain the original meaning and tone as closely as possible.  Be as accurate as possible.
 
@@ -265,19 +265,25 @@ def main():
 
         col1, col2 = st.columns(2)  # Use columns for better layout
         with col1:
-            #Crucial change:  Use the *second* element of the tuple (the language code) as the value.
-            source_language = st.selectbox("Source Language", options=language_options, format_func=lambda x: x[0], key="source_lang")
+            # Store the language *name* (first element of the tuple)
+            source_language_tuple = st.selectbox("Source Language", options=language_options, format_func=lambda x: x[0], key="source_lang")
+            source_language_name = source_language_tuple[0]  # Get the name
+            source_language_code = source_language_tuple[1]
+
         with col2:
-            #Crucial change: Use the *second* element of the tuple (the language code) as the value.
-            target_language = st.selectbox("Target Language", options=language_options, format_func=lambda x: x[0], key="target_lang")
+            # Store the language *name* (first element of the tuple)
+            target_language_tuple = st.selectbox("Target Language", options=language_options, format_func=lambda x: x[0], key="target_lang")
+            target_language_name = target_language_tuple[0]  # Get the name
+            target_language_code = target_language_tuple[1]
+
 
         if st.button("Translate"):
-            if source_language == target_language:
+            if source_language_name == target_language_name:
                 st.error("Source and target languages cannot be the same.")
                 return
 
             # Check for RTL *after* language selection, using the language code.
-            is_target_rtl = target_language[1].lower() in ['he', 'ar', 'fa', 'ur', 'yi']
+            is_target_rtl = target_language_code.lower() in ['he', 'ar', 'fa', 'ur', 'yi']
 
             with st.spinner("Processing document..."):
                 if filename.endswith(".docx"):
@@ -308,8 +314,8 @@ def main():
                 progress_bar = st.progress(0)  # Initialize progress bar
                 for i, paragraph in enumerate(paragraphs):
                     try:
-                        # Pass the language *codes* (e.g., 'en', 'he') to translate_paragraph.
-                        translated_text, status = translate_paragraph(paragraph, source_language[1], target_language[1], document_summary)
+                        # Pass the language *names* to translate_paragraph.
+                        translated_text, status = translate_paragraph(paragraph, source_language_name, target_language_name, document_summary)
                         df_data.append({
                             "paragraph_id": i + 1,
                             "source_text": paragraph,
