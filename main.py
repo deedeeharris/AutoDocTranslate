@@ -23,8 +23,13 @@ from PIL import Image
 
 # --- Configuration and Model Setup ---
 # Use Streamlit secrets for API key management
-GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-
+# --- API Key Logic ---
+if api_key_input:
+    api_key_to_use = api_key_input
+    st.sidebar.success("Using entered API key.")  # Optional: feedback
+else:
+    api_key_to_use = st.secrets["GEMINI_API_KEY"]
+    st.sidebar.info("Using API key from secrets.")  # Optional: feedback
 genai.configure(api_key=GEMINI_API_KEY)
 
 generation_config = {
@@ -207,6 +212,8 @@ def main():
     # --- Sidebar for Instructions and Information ---
     with st.sidebar:
         st.title("About")
+        api_key_input = st.text_input("Enter your Gemini API Key (optional)", type="password")
+
         st.markdown(
             "This app translates documents using Google's Gemini Pro model.  It supports `.docx` and `.pdf` files."
             " Upload your file, select the source and target languages, and click 'Translate'."
