@@ -178,6 +178,9 @@ def main():
         st.markdown(
             "**Get your Gemini API key:** [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)"
         )
+    
+        api_key_input = st.text_input("Enter your Gemini API Key (optional)", type="password")
+    
         st.markdown("---")
         st.markdown("**Developed by Yedidya Harris**")
         st.markdown(
