@@ -22,7 +22,7 @@ This Streamlit application uses Google's Gemini 2.0 Flash model to translate doc
 
 ## Requirements
 
-*   Python 3.7+
+*   Python 3.9+
 *   `streamlit`
 *   `google-generativeai`
 *   `python-docx`
