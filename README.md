@@ -7,7 +7,7 @@ This Streamlit application uses Google's Gemini 2.0 Flash model to translate doc
 
 ## Features
 
-*   **Document Translation:** Translates `.docx` documents using the Gemini 2.0 Flash model.
+*   **Document Translation:** Translates `.docx` and `.pdf` documents using the Gemini 2.0 Flash model.
 *   **Language Support:** Supports a wide range of languages for both source and target.  See the language selection dropdown in the app for the full list.
 *   **Summary Generation:** Generates a summary of the document in the target language.
 *   **Combined and Translated-Only Output:**  Produces two DOCX files:
