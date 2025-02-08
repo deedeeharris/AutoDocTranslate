@@ -7,16 +7,9 @@ from docx import Document
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_PARAGRAPH_ALIGNMENT
 from docx.oxml.shared import OxmlElement, qn
-#import fitz  # PyMuPDF #REMOVED
+import fitz  # PyMuPDF
 import logging
 import streamlit as st
-#from reportlab.lib.pagesizes import letter, A4 #REMOVED
-#from reportlab.pdfgen import canvas #REMOVED
-#from reportlab.lib import colors #REMOVED
-#from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Frame, PageTemplate #REMOVED
-#from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle #REMOVED
-#from reportlab.lib.units import inch #REMOVED
-#from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT, TA_CENTER, TA_RIGHT #REMOVED
 from google.api_core import exceptions as google_api_exceptions
 from PIL import Image
 import zipfile
@@ -50,17 +43,17 @@ def extract_text_from_docx(docx_bytes):
         st.error(f"Error extracting text from DOCX: {e}")
         return ""
 
-#def extract_text_from_pdf(pdf_bytes): #REMOVED
-#    """Extracts text from a .pdf file using PyMuPDF."""
-#    text = ""
-#    try:
-#        with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
-#            text = "".join([page.get_text() for page in doc])
-#        return text
-#    except Exception as e:
-#        logging.error(f"Error extracting text from PDF: {e}")
-#        st.error(f"Error extracting text from PDF: {e}")
-#        return ""
+def extract_text_from_pdf(pdf_bytes):
+    """Extracts text from a .pdf file using PyMuPDF."""
+    text = ""
+    try:
+        with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
+            text = "".join([page.get_text() for page in doc])
+        return text
+    except Exception as e:
+        logging.error(f"Error extracting text from PDF: {e}")
+        st.error(f"Error extracting text from PDF: {e}")
+        return ""
 
 def split_into_paragraphs(text):
     """Splits text into paragraphs based on double newlines."""
@@ -148,42 +141,6 @@ def set_table_rtl(table):
     bidi_visual = OxmlElement('w:bidiVisual')
     tblPr.append(bidi_visual)
 
-#def create_pdf_from_paragraphs(paragraphs, filename, is_rtl=False): #REMOVED
-#    """Creates a PDF from a list of paragraphs."""
-#    doc = SimpleDocTemplate(filename, pagesize=A4)
-#    elements = []
-#
-#    styles = getSampleStyleSheet()
-#    style = styles["Normal"]
-#    style.alignment = TA_JUSTIFY
-#    if is_rtl:
-#        style.alignment = TA_RIGHT
-#        style.firstLineIndent = 0
-#        style.rightIndent = 0
-#
-#    for para_text in paragraphs:
-#        p = Paragraph(para_text, style)
-#        elements.append(p)
-#        available_height = doc.height - doc.bottomMargin - doc.topMargin
-#        if elements:
-#            y = elements[-1].getSpaceAfter()
-#            available_height -= y
-#        w, h = p.wrap(doc.width, available_height)
-#        if h > available_height:
-#            elements.append(PageBreak())
-#
-#    def header_footer(canvas, doc):
-#        canvas.saveState()
-#        styles = getSampleStyleSheet()
-#        header = Paragraph("Translated with AI, by Yedidya Harris", styles['Normal'])
-#        header.wrapOn(canvas, doc.width, doc.topMargin)
-#        header.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - header.height)
-#        canvas.restoreState()
-#
-#    page_template = PageTemplate(id='basic', frames=[Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height)], onPage=header_footer)
-#    doc.addPageTemplates([page_template])
-#    doc.build(elements)
-
 # --- Configuration and Model Setup ---
 def configure_gemini(api_key):
     """Configures the Gemini AI model."""
@@ -257,10 +214,7 @@ def main():
     st.write("Upload a .docx or .pdf file to begin.")
 
     # --- Placeholders OUTSIDE of any columns or spinners ---
-    #progress_bar = st.progress(0)  # Initialize progress bar #REMOVED
-    #eta_placeholder = st.empty()  # Placeholder for ETA display #REMOVED
-
-    uploaded_file = st.file_uploader("Choose a file", type=["docx", "pdf"])
+    uploaded_file = st.file_uploader("Choose a file", type=["docx", "pdf"]) # BOTH DOCX and PDF
 
     if uploaded_file is not None:
         file_content = uploaded_file.read()
@@ -298,13 +252,12 @@ def main():
 
             is_target_rtl = target_language_code.lower() in ['he', 'ar', 'fa', 'ur', 'yi']
 
-            #with st.spinner("Processing document..."): #REMOVED
             if filename.endswith(".docx"):
                 text = extract_text_from_docx(file_content)
-            elif filename.endswith(".pdf"):
+            elif filename.endswith(".pdf"): # Handle PDF input
                 text = extract_text_from_pdf(file_content)
             else:
-                st.error("Unsupported file type.")
+                st.error("Unsupported file type. Please upload a .docx or .pdf file.")
                 return
 
             if not text:
@@ -312,7 +265,6 @@ def main():
                 return
 
             paragraphs = split_into_paragraphs(text)
-            #num_paragraphs = len(paragraphs) #NOT NEEDED WITH TQDM
             try:
                 document_summary = generate_summary(text, target_language_name)
                 st.success(f"Document summary generated in {target_language_name}.")
@@ -325,7 +277,6 @@ def main():
                 st.error(f"Error generating summary: {e}")
                 return
 
-            #with st.spinner("Translating..."): #REMOVED
 
             # --- tqdm Progress Bar Setup ---
             progress_placeholder = st.empty()  # Create placeholder *before* the loop
@@ -412,10 +363,6 @@ def main():
                 translated_doc_filename = "translated_document.docx"
                 translated_doc.save(translated_doc_filename)
 
-            # --- PDF Output ---
-            with st.spinner("Generating PDF file..."):
-                translated_pdf_filename = "translated_document.pdf"
-                create_pdf_from_paragraphs(translated_paragraphs, translated_pdf_filename, is_rtl=is_target_rtl)
 
             # --- Download Button (ZIP) ---
             st.subheader("Download Files")
@@ -426,7 +373,7 @@ def main():
             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
                 zip_file.write(combined_doc_filename, arcname=combined_doc_filename)
                 zip_file.write(translated_doc_filename, arcname=translated_doc_filename)
-                zip_file.write(translated_pdf_filename, arcname=translated_pdf_filename)
+
 
             st.download_button(
                 label="Download All Files (ZIP)",
@@ -438,7 +385,7 @@ def main():
             # Clean up temporary files (optional, but good practice)
             os.remove(combined_doc_filename)
             os.remove(translated_doc_filename)
-            os.remove(translated_pdf_filename)
+
 
 if __name__ == "__main__":
     main()
