@@ -7,16 +7,16 @@ from docx import Document
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_PARAGRAPH_ALIGNMENT
 from docx.oxml.shared import OxmlElement, qn
-import fitz  # PyMuPDF
+#import fitz  # PyMuPDF #REMOVED
 import logging
 import streamlit as st
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.pdfgen import canvas
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Frame, PageTemplate
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT, TA_CENTER, TA_RIGHT
+#from reportlab.lib.pagesizes import letter, A4 #REMOVED
+#from reportlab.pdfgen import canvas #REMOVED
+#from reportlab.lib import colors #REMOVED
+#from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Frame, PageTemplate #REMOVED
+#from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle #REMOVED
+#from reportlab.lib.units import inch #REMOVED
+#from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT, TA_CENTER, TA_RIGHT #REMOVED
 from google.api_core import exceptions as google_api_exceptions
 from PIL import Image
 import zipfile
@@ -29,15 +29,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # --- Helper Functions ---
 
-@contextlib.contextmanager
-def st_tqdm(iterable, desc=None, total=None, unit="it", **tqdm_kwargs):
-    """Context manager for tqdm progress bar in Streamlit."""
-    placeholder = st.empty()
-    with tqdm(iterable, desc=desc, total=total, unit=unit, **tqdm_kwargs) as pbar:
-        for item in pbar:
-            yield item
-            placeholder.write(pbar)
-
+# No st_tqdm context manager needed anymore
 
 def create_header(document, text):
     """Adds a header to each page of a docx document."""
@@ -58,17 +50,17 @@ def extract_text_from_docx(docx_bytes):
         st.error(f"Error extracting text from DOCX: {e}")
         return ""
 
-def extract_text_from_pdf(pdf_bytes):
-    """Extracts text from a .pdf file using PyMuPDF."""
-    text = ""
-    try:
-        with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
-            text = "".join([page.get_text() for page in doc])
-        return text
-    except Exception as e:
-        logging.error(f"Error extracting text from PDF: {e}")
-        st.error(f"Error extracting text from PDF: {e}")
-        return ""
+#def extract_text_from_pdf(pdf_bytes): #REMOVED
+#    """Extracts text from a .pdf file using PyMuPDF."""
+#    text = ""
+#    try:
+#        with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
+#            text = "".join([page.get_text() for page in doc])
+#        return text
+#    except Exception as e:
+#        logging.error(f"Error extracting text from PDF: {e}")
+#        st.error(f"Error extracting text from PDF: {e}")
+#        return ""
 
 def split_into_paragraphs(text):
     """Splits text into paragraphs based on double newlines."""
@@ -156,41 +148,41 @@ def set_table_rtl(table):
     bidi_visual = OxmlElement('w:bidiVisual')
     tblPr.append(bidi_visual)
 
-def create_pdf_from_paragraphs(paragraphs, filename, is_rtl=False):
-    """Creates a PDF from a list of paragraphs."""
-    doc = SimpleDocTemplate(filename, pagesize=A4)
-    elements = []
-
-    styles = getSampleStyleSheet()
-    style = styles["Normal"]
-    style.alignment = TA_JUSTIFY
-    if is_rtl:
-        style.alignment = TA_RIGHT
-        style.firstLineIndent = 0
-        style.rightIndent = 0
-
-    for para_text in paragraphs:
-        p = Paragraph(para_text, style)
-        elements.append(p)
-        available_height = doc.height - doc.bottomMargin - doc.topMargin
-        if elements:
-            y = elements[-1].getSpaceAfter()
-            available_height -= y
-        w, h = p.wrap(doc.width, available_height)
-        if h > available_height:
-            elements.append(PageBreak())
-
-    def header_footer(canvas, doc):
-        canvas.saveState()
-        styles = getSampleStyleSheet()
-        header = Paragraph("Translated with AI, by Yedidya Harris", styles['Normal'])
-        header.wrapOn(canvas, doc.width, doc.topMargin)
-        header.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - header.height)
-        canvas.restoreState()
-
-    page_template = PageTemplate(id='basic', frames=[Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height)], onPage=header_footer)
-    doc.addPageTemplates([page_template])
-    doc.build(elements)
+#def create_pdf_from_paragraphs(paragraphs, filename, is_rtl=False): #REMOVED
+#    """Creates a PDF from a list of paragraphs."""
+#    doc = SimpleDocTemplate(filename, pagesize=A4)
+#    elements = []
+#
+#    styles = getSampleStyleSheet()
+#    style = styles["Normal"]
+#    style.alignment = TA_JUSTIFY
+#    if is_rtl:
+#        style.alignment = TA_RIGHT
+#        style.firstLineIndent = 0
+#        style.rightIndent = 0
+#
+#    for para_text in paragraphs:
+#        p = Paragraph(para_text, style)
+#        elements.append(p)
+#        available_height = doc.height - doc.bottomMargin - doc.topMargin
+#        if elements:
+#            y = elements[-1].getSpaceAfter()
+#            available_height -= y
+#        w, h = p.wrap(doc.width, available_height)
+#        if h > available_height:
+#            elements.append(PageBreak())
+#
+#    def header_footer(canvas, doc):
+#        canvas.saveState()
+#        styles = getSampleStyleSheet()
+#        header = Paragraph("Translated with AI, by Yedidya Harris", styles['Normal'])
+#        header.wrapOn(canvas, doc.width, doc.topMargin)
+#        header.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - header.height)
+#        canvas.restoreState()
+#
+#    page_template = PageTemplate(id='basic', frames=[Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height)], onPage=header_footer)
+#    doc.addPageTemplates([page_template])
+#    doc.build(elements)
 
 # --- Configuration and Model Setup ---
 def configure_gemini(api_key):
@@ -320,7 +312,7 @@ def main():
                 return
 
             paragraphs = split_into_paragraphs(text)
-            num_paragraphs = len(paragraphs) #NOT NEEDED WITH TQDM
+            #num_paragraphs = len(paragraphs) #NOT NEEDED WITH TQDM
             try:
                 document_summary = generate_summary(text, target_language_name)
                 st.success(f"Document summary generated in {target_language_name}.")
@@ -334,17 +326,20 @@ def main():
                 return
 
             #with st.spinner("Translating..."): #REMOVED
+
+            # --- tqdm Progress Bar Setup ---
+            progress_placeholder = st.empty()  # Create placeholder *before* the loop
             df_data = []
             translated_paragraphs = []
             start_time = time.time()
             total_api_time = 0
 
-            with st_tqdm(paragraphs, desc="Translating Paragraphs", unit="paragraph") as pbar:
+            # Use tqdm directly, and update the placeholder inside the loop
+            with tqdm(paragraphs, desc="Translating Paragraphs", unit="paragraph") as pbar:
                 for i, paragraph in enumerate(pbar):
                     try:
                         translated_text, status, api_call_time = translate_paragraph(paragraph, source_language_name, target_language_name, document_summary)
                         total_api_time += api_call_time
-                        #pbar.update(1) #TQDM HANDLES IT
 
                         df_data.append({
                             "paragraph_id": i + 1,
@@ -358,15 +353,8 @@ def main():
                         st.error(f"Error: {e}")
                         return
 
-                    # --- Progress Bar and ETA Calculation ---
-                    #progress = (i + 1) / num_paragraphs #TQDM HANDLES IT
-                    #progress_bar.progress(progress) #TQDM HANDLES IT
-
-                    #if i > 0: #TQDM HANDLES IT
-                    #    elapsed_time = time.time() - start_time #TQDM HANDLES IT
-                    #    estimated_total_time = (total_api_time / progress) + (10 * (num_paragraphs - i -1)) # Add remaining delay #TQDM HANDLES IT
-                    #    remaining_time = estimated_total_time - elapsed_time #TQDM HANDLES IT
-                    #    eta_placeholder.write(f"Estimated time remaining: {remaining_time:.2f} seconds") #TQDM HANDLES IT
+                    # --- Update Progress Bar ---
+                    progress_placeholder.text(str(pbar))  # Convert tqdm object to string
 
                     time.sleep(10)  # 10-second delay after EACH paragraph
 
