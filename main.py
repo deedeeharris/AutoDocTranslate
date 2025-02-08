@@ -166,7 +166,7 @@ def main():
 
     st.set_page_config(page_title="AI Document Translator", page_icon=":globe_with_meridians:", layout="wide")
 
-    st.title("About")
+    st.title("AI Document Translator")
     
     st.markdown(
         "This app translates documents using Google's Gemini 2.0 Flash model.  It supports `.docx` and `.pdf` files as input."
@@ -202,7 +202,6 @@ def main():
 
 
     # --- Main Content Area ---
-    st.title("AI Document Translator")
     st.write("Upload a .docx or .pdf file to begin.")
     api_key_input = st.text_input("Enter your Gemini API Key (optional)", type="password")
 
