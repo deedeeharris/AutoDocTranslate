@@ -20,6 +20,7 @@ from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT, TA_CENTER, TA_RIGHT
 from google.api_core import exceptions as google_api_exceptions
 from PIL import Image
 import zipfile
+from tqdm import tqdm
 
 
 # --- Logging Setup ---
@@ -327,7 +328,7 @@ def main():
                 start_time = time.time()
                 total_api_time = 0
 
-                for i, paragraph in enumerate(paragraphs):
+                for i, paragraph in enumerate(tqdm(paragraphs, desc="Translating Paragraphs", unit="paragraph")):
                     try:
                         translated_text, status, api_call_time = translate_paragraph(paragraph, source_language_name, target_language_name, document_summary)
                         total_api_time += api_call_time
