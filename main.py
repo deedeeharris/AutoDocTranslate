@@ -211,7 +211,7 @@ def main():
         api_key_input = st.text_input("Enter your Gemini API Key (optional)", type="password")
 
         st.markdown(
-            "This app translates documents using Google's Gemini Pro model.  It supports `.docx` and `.pdf` files."
+            "This app translates documents using Google's Gemini (2.0 flash) model.  It supports `.docx` and `.pdf` files."
             " Upload your file, select the source and target languages, and click 'Translate'."
             " The app provides both a combined (source/target) and a translated-only version of your document."
         )
