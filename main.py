@@ -166,25 +166,27 @@ def main():
 
     st.set_page_config(page_title="AI Document Translator", page_icon=":globe_with_meridians:", layout="wide")
 
+    st.title("About")
+    
+    st.markdown(
+        "This app translates documents using Google's Gemini 2.0 Flash model.  It supports `.docx` and `.pdf` files as input."
+        " The output will be two `.docx` files, a combined and a translated-only version."
+    )
+
+    st.markdown(
+        "**Get your Gemini API key:** [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)"
+    )
+    
+    st.markdown("---")
+    st.markdown("**Developed by Yedidya Harris**")
+    st.markdown(
+        "This is a demonstration project and may have limitations.  For critical translations, always consult a professional human translator."
+    )
+    st.markdown("---")
+
     # --- Sidebar for Instructions and Information ---
     with st.sidebar:
-        st.title("About")
-    
-        st.markdown(
-            "This app translates documents using Google's Gemini 2.0 Flash model.  It supports `.docx` and `.pdf` files as input."
-            " The output will be two `.docx` files, a combined and a translated-only version."
-        )
-    
-        st.markdown(
-            "**Get your Gemini API key:** [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)"
-        )
         
-        st.markdown("---")
-        st.markdown("**Developed by Yedidya Harris**")
-        st.markdown(
-            "This is a demonstration project and may have limitations.  For critical translations, always consult a professional human translator."
-        )
-        st.markdown("---")
 
         try:
             image = Image.open('translator_image.png')  # Replace with your image path
