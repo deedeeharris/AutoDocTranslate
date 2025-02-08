@@ -169,12 +169,14 @@ def main():
     # --- Sidebar for Instructions and Information ---
     with st.sidebar:
         st.title("About")
-        api_key_input = st.text_input("Enter your Gemini API Key (optional)", type="password")
-
+    
         st.markdown(
-            "This app translates documents using Google's Gemini (2.0 flash) model.  It supports `.docx` and `.pdf` files."
-            " Upload your file, select the source and target languages, and click 'Translate'."
-            " The app provides both a combined (source/target) and a translated-only version of your document."
+            "This app translates documents using Google's Gemini 2.0 Flash model.  It supports `.docx` and `.pdf` files as input."
+            " The output will be two `.docx` files, a combined and a translated-only version."
+        )
+    
+        st.markdown(
+            "**Get your Gemini API key:** [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)"
         )
         st.markdown("---")
         st.markdown("**Developed by Yedidya Harris**")
