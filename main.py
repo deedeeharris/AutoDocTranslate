@@ -19,7 +19,7 @@ from reportlab.lib.units import inch
 from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT, TA_CENTER, TA_RIGHT
 from google.api_core import exceptions as google_api_exceptions
 from PIL import Image
-
+import zipfile
 
 
 # --- Logging Setup ---
@@ -415,30 +415,24 @@ def main():
                 translated_pdf_filename = "translated_document.pdf"
                 create_pdf_from_paragraphs(translated_paragraphs, translated_pdf_filename, is_rtl=is_target_rtl)
 
-            # --- Download Links ---
+            # --- Download Button (ZIP) ---
             st.subheader("Download Files")
-            with open(combined_doc_filename, "rb") as f:
-                st.download_button(
-                    label="Download Combined Translation (DOCX)",
-                    data=f,
-                    file_name=combined_doc_filename,
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                )
-            with open(translated_doc_filename, "rb") as f:
-                st.download_button(
-                    label="Download Translated Document (DOCX)",
-                    data=f,
-                    file_name=translated_doc_filename,
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                )
-            with open(translated_pdf_filename, "rb") as f:
-                st.download_button(
-                    label="Download Translated Document (PDF)",
-                    data=f,
-                    file_name=translated_pdf_filename,
-                    mime="application/pdf",
-                )
-
+            
+            # Create a BytesIO object to hold the zip file in memory
+            zip_buffer = io.BytesIO()
+            
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                zip_file.write(combined_doc_filename, arcname=combined_doc_filename)
+                zip_file.write(translated_doc_filename, arcname=translated_doc_filename)
+                zip_file.write(translated_pdf_filename, arcname=translated_pdf_filename)
+            
+            st.download_button(
+                label="Download All Files (ZIP)",
+                data=zip_buffer.getvalue(),
+                file_name="translated_files.zip",
+                mime="application/zip",
+            )
+            
             # Clean up temporary files (optional, but good practice)
             os.remove(combined_doc_filename)
             os.remove(translated_doc_filename)
