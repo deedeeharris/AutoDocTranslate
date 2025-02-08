@@ -15,7 +15,7 @@ from PIL import Image
 import zipfile
 from tqdm import tqdm
 import contextlib
-
+import re
 
 # --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -55,6 +55,24 @@ def extract_text_from_pdf(pdf_bytes):
         st.error(f"Error extracting text from PDF: {e}")
         return ""
 
+def split_long_paragraphs(paragraphs, max_sentences=50):
+    """Splits long paragraphs into smaller chunks, each containing at most `max_sentences` sentences."""
+    
+    sentence_endings = re.compile(r'([.!?;])')  # Regular expression to match sentence endings
+    new_paragraphs = []
+
+    for paragraph in paragraphs:
+        sentences = sentence_endings.split(paragraph)  # Split text into sentences and keep delimiters
+        sentences = [s1 + (s2 if s2 in ".!?;" else "") for s1, s2 in zip(sentences[::2], sentences[1::2] + [""])]  # Recombine sentences with their punctuation
+
+        if len(sentences) > max_sentences:
+            for i in range(0, len(sentences), max_sentences):
+                new_paragraphs.append(" ".join(sentences[i:i+max_sentences]))  # Create new chunks of 50 sentences
+        else:
+            new_paragraphs.append(paragraph)  # Keep original if within limit
+
+    return new_paragraphs
+    
 def split_into_paragraphs(text):
     """Splits text into paragraphs based on double newlines."""
     return [p.strip() for p in text.split("\n\n") if p.strip()]
@@ -267,6 +285,7 @@ def main():
                 return
 
             paragraphs = split_into_paragraphs(text)
+            paragraphs = split_long_paragraphs(paragraphs)  # Ensure long paragraphs are split
             try:
                 document_summary = generate_summary(text, target_language_name)
                 st.success(f"Document summary generated in {target_language_name}.")
