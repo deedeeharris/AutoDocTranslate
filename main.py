@@ -187,10 +187,7 @@ def main():
             "This is a demonstration project and may have limitations.  For critical translations, always consult a professional human translator."
         )
         st.markdown("---")
-        st.markdown("**Language Support:**")
-        st.markdown("The app supports a wide range of languages.  If you encounter any issues with a specific language, please let me know.")
 
-        # Add a nice image to the sidebar
         try:
             image = Image.open('translator_image.png')  # Replace with your image path
             st.image(image, caption='AI Translation', use_container_width=True)
@@ -199,7 +196,6 @@ def main():
 
 
     # --- Configuration and Model Setup ---
-    # Use Streamlit secrets for API key management
     # --- API Key Logic ---
     if api_key_input:
         api_key_to_use = api_key_input
@@ -290,7 +286,6 @@ def main():
             start_time = time.time()
             total_api_time = 0
 
-            # Use tqdm directly, and update the placeholder inside the loop
             with tqdm(paragraphs, desc="Translating Paragraphs", unit="paragraph") as pbar:
                 for i, paragraph in enumerate(pbar):
                     try:
