@@ -178,9 +178,7 @@ def main():
         st.markdown(
             "**Get your Gemini API key:** [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)"
         )
-    
-        api_key_input = st.text_input("Enter your Gemini API Key (optional)", type="password")
-    
+        
         st.markdown("---")
         st.markdown("**Developed by Yedidya Harris**")
         st.markdown(
@@ -196,26 +194,28 @@ def main():
 
 
     # --- Configuration and Model Setup ---
-    # --- API Key Logic ---
-    if api_key_input:
-        api_key_to_use = api_key_input
-        st.sidebar.success("Using entered API key.")  # Optional: feedback
-    else:
-        api_key_to_use = st.secrets["GEMINI_API_KEY"]
-        st.sidebar.info("Using API key from secrets.")  # Optional: feedback
-
+ 
     # **Initialize the Gemini model globally**
     global model
-    model = configure_gemini(api_key_to_use)
-
 
 
     # --- Main Content Area ---
     st.title("AI Document Translator")
     st.write("Upload a .docx or .pdf file to begin.")
+    api_key_input = st.text_input("Enter your Gemini API Key (optional)", type="password")
+
 
     # --- Placeholders OUTSIDE of any columns or spinners ---
     uploaded_file = st.file_uploader("Choose a file", type=["docx", "pdf"]) # BOTH DOCX and PDF
+    if api_key_input:
+        api_key_to_use = api_key_input
+        st.success("Using entered API key.") 
+    else:
+        api_key_to_use = st.secrets["GEMINI_API_KEY"]
+        st.info("Using API key from secrets.") 
+    
+    model = configure_gemini(api_key_to_use)
+
 
     if uploaded_file is not None:
         file_content = uploaded_file.read()
