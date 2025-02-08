@@ -1,7 +1,7 @@
 
 # AI Document Translator
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://your-streamlit-app-url.com)  <!-- Replace with your app's URL -->
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://autodoctranslate.streamlit.app/)  <!-- Replace with your app's URL -->
 
 This Streamlit application uses Google's Gemini 2.0 Flash model to translate documents from a source language to a target language. It supports `.docx` files. The app provides a combined translation (showing both source and target text) and a translated-only version, both downloadable as a single ZIP archive.
 
