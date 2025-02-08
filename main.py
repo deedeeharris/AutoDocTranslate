@@ -87,10 +87,14 @@ def split_long_paragraphs(paragraphs, max_sentences=50):
 
     return new_paragraphs
     
-def split_into_paragraphs(text):
+def split_into_paragraphs_old(text):
     """Splits text into paragraphs based on double newlines."""
     return [p.strip() for p in text.split("\n\n") if p.strip()]
 
+def split_into_paragraphs(text):
+    """Splits text into paragraphs using double newlines or significant whitespace."""
+    return [p.strip() for p in re.split(r'\n\s*\n+', text) if p.strip()]
+    
 def create_translation_prompt(source_language, target_language, document_summary, paragraph):
     """Creates the translation prompt for Gemini."""
     return f"""You are a professional translator. Translate the following paragraph from {source_language} to {target_language}.
