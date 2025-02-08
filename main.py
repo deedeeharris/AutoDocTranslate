@@ -21,7 +21,7 @@ from google.api_core import exceptions as google_api_exceptions
 from PIL import Image
 import zipfile
 from tqdm import tqdm
-import contextlib  
+import contextlib
 
 
 # --- Logging Setup ---
@@ -29,14 +29,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # --- Helper Functions ---
 
- @contextlib.contextmanager
- def st_tqdm(iterable, desc=None, total=None, unit="it", **tqdm_kwargs):
-     """Context manager for tqdm progress bar in Streamlit."""
-     placeholder = st.empty()
-     with tqdm(iterable, desc=desc, total=total, unit=unit, **tqdm_kwargs) as pbar:
-         for item in pbar:
-             yield item
-             placeholder.write(pbar)
+@contextlib.contextmanager
+def st_tqdm(iterable, desc=None, total=None, unit="it", **tqdm_kwargs):
+    """Context manager for tqdm progress bar in Streamlit."""
+    placeholder = st.empty()
+    with tqdm(iterable, desc=desc, total=total, unit=unit, **tqdm_kwargs) as pbar:
+        for item in pbar:
+            yield item
+            placeholder.write(pbar)
 
 
 def create_header(document, text):
@@ -196,14 +196,14 @@ def create_pdf_from_paragraphs(paragraphs, filename, is_rtl=False):
 def configure_gemini(api_key):
     """Configures the Gemini AI model."""
     genai.configure(api_key=api_key)
-    
+
     generation_config = {
         "temperature": 0.1,  # More deterministic, less "creative"
         "top_p": 0.95,
         "top_k": 64,
         "max_output_tokens": 8192,
     }
-    
+
     model = genai.GenerativeModel(
         model_name="gemini-2.0-flash",
         generation_config=generation_config,
@@ -253,20 +253,20 @@ def main():
     else:
         api_key_to_use = st.secrets["GEMINI_API_KEY"]
         st.sidebar.info("Using API key from secrets.")  # Optional: feedback
-    
-    # **Initialize the Gemini model globally**
-    global model  
-    model = configure_gemini(api_key_to_use)
-    
 
-    
+    # **Initialize the Gemini model globally**
+    global model
+    model = configure_gemini(api_key_to_use)
+
+
+
     # --- Main Content Area ---
     st.title("AI Document Translator")
     st.write("Upload a .docx or .pdf file to begin.")
 
     # --- Placeholders OUTSIDE of any columns or spinners ---
-    progress_bar = st.progress(0)  # Initialize progress bar
-    eta_placeholder = st.empty()  # Placeholder for ETA display
+    #progress_bar = st.progress(0)  # Initialize progress bar #REMOVED
+    #eta_placeholder = st.empty()  # Placeholder for ETA display #REMOVED
 
     uploaded_file = st.file_uploader("Choose a file", type=["docx", "pdf"])
 
@@ -306,44 +306,45 @@ def main():
 
             is_target_rtl = target_language_code.lower() in ['he', 'ar', 'fa', 'ur', 'yi']
 
-            with st.spinner("Processing document..."):
-                if filename.endswith(".docx"):
-                    text = extract_text_from_docx(file_content)
-                elif filename.endswith(".pdf"):
-                    text = extract_text_from_pdf(file_content)
-                else:
-                    st.error("Unsupported file type.")
-                    return
+            #with st.spinner("Processing document..."): #REMOVED
+            if filename.endswith(".docx"):
+                text = extract_text_from_docx(file_content)
+            elif filename.endswith(".pdf"):
+                text = extract_text_from_pdf(file_content)
+            else:
+                st.error("Unsupported file type.")
+                return
 
-                if not text:
-                    st.error("Could not extract text from the document.")
-                    return
+            if not text:
+                st.error("Could not extract text from the document.")
+                return
 
-                paragraphs = split_into_paragraphs(text)
-                num_paragraphs = len(paragraphs)
-                try:
-                    document_summary = generate_summary(text, target_language_name)
-                    st.success(f"Document summary generated in {target_language_name}.")
-                    with st.expander("Show Summary in Target Language"):
-                        st.write(document_summary)
-                except ValueError as e:
-                    st.error(f"Error: {e}")
-                    return
-                except Exception as e:
-                    st.error(f"Error generating summary: {e}")
-                    return
+            paragraphs = split_into_paragraphs(text)
+            num_paragraphs = len(paragraphs) #NOT NEEDED WITH TQDM
+            try:
+                document_summary = generate_summary(text, target_language_name)
+                st.success(f"Document summary generated in {target_language_name}.")
+                with st.expander("Show Summary in Target Language"):
+                    st.write(document_summary)
+            except ValueError as e:
+                st.error(f"Error: {e}")
+                return
+            except Exception as e:
+                st.error(f"Error generating summary: {e}")
+                return
 
-            with st.spinner("Translating..."):
-                df_data = []
-                translated_paragraphs = []
-                start_time = time.time()
-                total_api_time = 0
+            #with st.spinner("Translating..."): #REMOVED
+            df_data = []
+            translated_paragraphs = []
+            start_time = time.time()
+            total_api_time = 0
 
-             with st_tqdm(paragraphs, desc="Translating Paragraphs", unit="paragraph") as pbar:
-                 for i, paragraph in enumerate(pbar):
-                     try:
+            with st_tqdm(paragraphs, desc="Translating Paragraphs", unit="paragraph") as pbar:
+                for i, paragraph in enumerate(pbar):
+                    try:
                         translated_text, status, api_call_time = translate_paragraph(paragraph, source_language_name, target_language_name, document_summary)
                         total_api_time += api_call_time
+                        #pbar.update(1) #TQDM HANDLES IT
 
                         df_data.append({
                             "paragraph_id": i + 1,
@@ -358,20 +359,20 @@ def main():
                         return
 
                     # --- Progress Bar and ETA Calculation ---
-                    progress = (i + 1) / num_paragraphs
-                    progress_bar.progress(progress)
+                    #progress = (i + 1) / num_paragraphs #TQDM HANDLES IT
+                    #progress_bar.progress(progress) #TQDM HANDLES IT
 
-                    if i > 0:
-                        elapsed_time = time.time() - start_time
-                        estimated_total_time = (total_api_time / progress) + (10 * (num_paragraphs - i -1)) # Add remaining delay
-                        remaining_time = estimated_total_time - elapsed_time
-                        eta_placeholder.write(f"Estimated time remaining: {remaining_time:.2f} seconds")
+                    #if i > 0: #TQDM HANDLES IT
+                    #    elapsed_time = time.time() - start_time #TQDM HANDLES IT
+                    #    estimated_total_time = (total_api_time / progress) + (10 * (num_paragraphs - i -1)) # Add remaining delay #TQDM HANDLES IT
+                    #    remaining_time = estimated_total_time - elapsed_time #TQDM HANDLES IT
+                    #    eta_placeholder.write(f"Estimated time remaining: {remaining_time:.2f} seconds") #TQDM HANDLES IT
 
                     time.sleep(10)  # 10-second delay after EACH paragraph
 
 
-                df = pd.DataFrame(df_data)
-                st.success("Translation complete!")
+            df = pd.DataFrame(df_data)
+            st.success("Translation complete!")
 
             # --- Display Results ---
             st.subheader("Translation Results")
@@ -430,22 +431,22 @@ def main():
 
             # --- Download Button (ZIP) ---
             st.subheader("Download Files")
-            
+
             # Create a BytesIO object to hold the zip file in memory
             zip_buffer = io.BytesIO()
-            
+
             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
                 zip_file.write(combined_doc_filename, arcname=combined_doc_filename)
                 zip_file.write(translated_doc_filename, arcname=translated_doc_filename)
                 zip_file.write(translated_pdf_filename, arcname=translated_pdf_filename)
-            
+
             st.download_button(
                 label="Download All Files (ZIP)",
                 data=zip_buffer.getvalue(),
                 file_name="translated_files.zip",
                 mime="application/zip",
             )
-            
+
             # Clean up temporary files (optional, but good practice)
             os.remove(combined_doc_filename)
             os.remove(translated_doc_filename)
