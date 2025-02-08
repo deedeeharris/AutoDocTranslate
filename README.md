@@ -93,7 +93,7 @@ tqdm
 ## Important Notes
 
 *   **API Key:**  You *must* have a valid Google Gemini API key to use this application.  Obtain one from the [Google AI Studio](https://aistudio.google.com/apikey).
-*   **Rate Limits:**  Be aware of the Gemini API's rate limits.  The code includes a 10-second delay between paragraph translations to help avoid exceeding these limits.  You may need to adjust this delay depending on your usage and the API's current limits.
+*   **Rate Limits:**  Be aware of the Gemini API's rate limits.  The code includes a 5-second delay between paragraph translations to help avoid exceeding these limits.  You may need to adjust this delay depending on your usage and the API's current limits.
 
 ## Contributing
 
