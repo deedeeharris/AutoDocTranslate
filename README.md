@@ -52,7 +52,6 @@ This Streamlit application uses Google's Gemini 2.0 Flash model to translate doc
     ```bash
     pip install -r requirements.txt
     ```
-    (Make sure you have a `requirements.txt` file with the necessary packages listed.)  A suitable `requirements.txt` file is provided below.
 
 4.  **Set up your Gemini API Key:**
 
