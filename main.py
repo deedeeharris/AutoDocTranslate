@@ -43,7 +43,7 @@ def extract_text_from_docx(docx_bytes):
         st.error(f"Error extracting text from DOCX: {e}")
         return ""
 
-def extract_text_from_pdf(pdf_bytes):
+def extract_text_from_pdf_old(pdf_bytes):
     """Extracts text from a .pdf file using PyMuPDF."""
     text = ""
     try:
@@ -54,6 +54,20 @@ def extract_text_from_pdf(pdf_bytes):
         logging.error(f"Error extracting text from PDF: {e}")
         st.error(f"Error extracting text from PDF: {e}")
         return ""
+
+def extract_text_from_pdf(pdf_bytes):
+    """Extracts text from a .pdf file while preserving paragraph breaks."""
+    text = []
+    try:
+        with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
+            for page in doc:
+                text.append(page.get_text("text"))  # Use "text" mode to preserve line breaks
+        return "\n\n".join(text)  # Ensure paragraphs remain separated
+    except Exception as e:
+        logging.error(f"Error extracting text from PDF: {e}")
+        st.error(f"Error extracting text from PDF: {e}")
+        return ""
+
 
 def split_long_paragraphs(paragraphs, max_sentences=50):
     """Splits long paragraphs into smaller chunks, each containing at most `max_sentences` sentences."""
