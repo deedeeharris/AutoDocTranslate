@@ -80,13 +80,6 @@ This Streamlit application uses Google's Gemini 2.0 Flash model to translate doc
 5.  **Download Results:** Once the translation is complete, a "Download All Files (ZIP)" button will appear.  Click it to download a ZIP archive containing the combined and translated DOCX files.
 6. **View Summary:** You can view the generated summary in the target language by expanding the "Show Summary in Target Language" section.
 
-## Project Structure
-
-*   **`main.py`:** The main Streamlit application file.  Contains the UI, translation logic, and file handling.
-*   **`requirements.txt`:**  Lists the required Python packages.
-*   **`.streamlit/secrets.toml`:** (Recommended) Stores your Gemini API key securely.
-*   **`translator_image.png`:** (Optional) An image file for the sidebar. You can replace this with your own image or remove the image-related code if you don't need it.
-
 ## `requirements.txt`
 
 ```
