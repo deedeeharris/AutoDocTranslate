@@ -5,7 +5,6 @@
 *   **Rate Limits:**  Be aware of the Gemini API's rate limits.  The code includes a 10-second delay between paragraph translations to help avoid exceeding these limits.  You may need to adjust this delay depending on your usage and the API's current limits.
 *   **Error Handling:** The application includes error handling for common issues, but it's not exhaustive.  For production use, consider adding more comprehensive error handling and logging.
 *   **Demo Project:** This is a demonstration project and may have limitations.  For critical translations, always consult a professional human translator.
-* **PDF Support:** The current version only supports `.docx` files. PDF support has been removed.
 
 ## Contributing
 
