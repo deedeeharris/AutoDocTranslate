@@ -307,7 +307,7 @@ def main():
                     # --- Update Progress Bar ---
                     progress_placeholder.text(str(pbar))  # Convert tqdm object to string
 
-                    time.sleep(10)  # 10-second delay after EACH paragraph
+                    time.sleep(5)  # 10-second delay after EACH paragraph
 
 
             df = pd.DataFrame(df_data)
