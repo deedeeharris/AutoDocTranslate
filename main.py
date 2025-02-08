@@ -21,12 +21,23 @@ from google.api_core import exceptions as google_api_exceptions
 from PIL import Image
 import zipfile
 from tqdm import tqdm
+import contextlib  
 
 
 # --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # --- Helper Functions ---
+
+ @contextlib.contextmanager
+ def st_tqdm(iterable, desc=None, total=None, unit="it", **tqdm_kwargs):
+     """Context manager for tqdm progress bar in Streamlit."""
+     placeholder = st.empty()
+     with tqdm(iterable, desc=desc, total=total, unit=unit, **tqdm_kwargs) as pbar:
+         for item in pbar:
+             yield item
+             placeholder.write(pbar)
+
 
 def create_header(document, text):
     """Adds a header to each page of a docx document."""
@@ -328,8 +339,9 @@ def main():
                 start_time = time.time()
                 total_api_time = 0
 
-                for i, paragraph in enumerate(tqdm(paragraphs, desc="Translating Paragraphs", unit="paragraph")):
-                    try:
+             with st_tqdm(paragraphs, desc="Translating Paragraphs", unit="paragraph") as pbar:
+                 for i, paragraph in enumerate(pbar):
+                     try:
                         translated_text, status, api_call_time = translate_paragraph(paragraph, source_language_name, target_language_name, document_summary)
                         total_api_time += api_call_time
 
