@@ -246,10 +246,10 @@ def main():
     uploaded_file = st.file_uploader("Choose a file", type=["docx", "pdf"]) # BOTH DOCX and PDF
 
     # --- API Key Validation and Model Configuration ---
-    # We'll do the configuration ONLY when the user clicks "Translate" AND has provided a key.
 
     if uploaded_file is not None:
-        # ... (rest of your file type and language selection code remains the same) ...
+        file_content = uploaded_file.read()
+        filename = uploaded_file.name
         language_options = [
             ('English', 'en'), ('Spanish', 'es'), ('French', 'fr'), ('German', 'de'),
             ('Chinese (Simplified)', 'zh-CN'), ('Chinese (Traditional)', 'zh-TW'),
