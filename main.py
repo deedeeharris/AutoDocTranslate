@@ -239,25 +239,17 @@ def main():
 
     # --- Main Content Area ---
     st.write("Upload a .docx or .pdf file to begin.")
-    api_key_input = st.text_input("Enter your Gemini API Key (optional)", type="password")
-
+    # Make the API key input REQUIRED.  Remove "(optional)" and add validation.
+    api_key_input = st.text_input("Enter your Gemini API Key", type="password")
 
     # --- Placeholders OUTSIDE of any columns or spinners ---
     uploaded_file = st.file_uploader("Choose a file", type=["docx", "pdf"]) # BOTH DOCX and PDF
-    if api_key_input:
-        api_key_to_use = api_key_input
-        st.success("Using entered API key.") 
-    else:
-        api_key_to_use = st.secrets["GEMINI_API_KEY"]
-        st.info("Using API key from secrets.") 
-    
-    model = configure_gemini(api_key_to_use)
 
+    # --- API Key Validation and Model Configuration ---
+    # We'll do the configuration ONLY when the user clicks "Translate" AND has provided a key.
 
     if uploaded_file is not None:
-        file_content = uploaded_file.read()
-        filename = uploaded_file.name
-
+        # ... (rest of your file type and language selection code remains the same) ...
         language_options = [
             ('English', 'en'), ('Spanish', 'es'), ('French', 'fr'), ('German', 'de'),
             ('Chinese (Simplified)', 'zh-CN'), ('Chinese (Traditional)', 'zh-TW'),
@@ -282,8 +274,19 @@ def main():
             target_language_name = target_language_tuple[0]
             target_language_code = target_language_tuple[1]
 
-
         if st.button("Translate"):
+            # --- API Key Validation ---
+            if not api_key_input:
+                st.error("Please enter your Gemini API key to proceed.")
+                return  # Stop execution if no API key
+
+            # --- Model Configuration (now inside the button click) ---
+            try:
+                model = configure_gemini(api_key_input)  # Use the entered key
+            except Exception as e:
+                st.error(f"Error configuring Gemini: {e}")
+                return # Stop if there's an error with the API key
+
             if source_language_name == target_language_name:
                 st.error("Source and target languages cannot be the same.")
                 return
@@ -423,7 +426,6 @@ def main():
             # Clean up temporary files (optional, but good practice)
             os.remove(combined_doc_filename)
             os.remove(translated_doc_filename)
-
 
 if __name__ == "__main__":
     main()
